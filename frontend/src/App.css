@@ -1,5 +1,6 @@
 @import "tailwindcss";
 
+@import './styles/sonner.css';
 
 .bg-gradient {
     @apply bg-gradient-to-b from-gray-900 to-gray-800

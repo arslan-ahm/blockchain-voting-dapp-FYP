@@ -58,18 +58,20 @@ export const useProfile = () => {
       if (values.profileImage) {
         profileImageIpfsHash = await uploadFile(values.profileImage);
       }
-      dispatch(
-        updateUserDetails({
-          name: values.name,
-          email: values.email,
-          dateOfBirth: values.dateOfBirth,
-          identityNumber: user.details?.identityNumber || "",
-          contactNumber: user.details?.contactNumber || "",
-          bio: user.details?.bio || "",
-          profileImageIpfsHash,
-          supportiveLinks: user.details?.supportiveLinks || [],
-        })
-      );
+      toast.success("Profile updated successfully");
+      console.log("Profile image IPFS hash:", profileImageIpfsHash);
+      // dispatch(
+      //   updateUserDetails({
+      //     name: values.name,
+      //     email: values.email,
+      //     dateOfBirth: values.dateOfBirth,
+      //     identityNumber: user.details?.identityNumber || "",
+      //     contactNumber: user.details?.contactNumber || "",
+      //     bio: user.details?.bio || "",
+      //     profileImageIpfsHash,
+      //     supportiveLinks: user.details?.supportiveLinks || [],
+      //   })
+      // );
     } catch (error) {
       console.error("Failed to update user details:", error);
       toast.error("Failed to update user details");
