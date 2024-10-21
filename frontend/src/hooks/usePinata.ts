@@ -17,7 +17,12 @@ export const usePinata = () => {
         body: formData,
       });
 
+      if (!response.ok) {
+        throw new Error(`Pinata API error: ${response.statusText}`);
+      }
+
       const result = await response.json();
+
       if (result.IpfsHash) {
         toast.success('File uploaded to IPFS');
         return result.IpfsHash;

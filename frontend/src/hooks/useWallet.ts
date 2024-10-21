@@ -76,5 +76,24 @@ export const useWallet = () => {
     checkConnection();
   }, [dispatch, isLoggedOut]);
 
+  useEffect(() => {
+    if (window.ethereum) {
+      const handleAccountsChanged = (...args: unknown[]) => {
+        const accounts = args[0] as string[] | undefined;
+        if (!accounts || accounts.length === 0) {
+          disconnect();
+        } else {
+          setAccount(accounts[0]);
+        }
+      };
+      window.ethereum.on("accountsChanged", handleAccountsChanged);
+      return () => {
+        if (window.ethereum) {
+          window.ethereum.removeListener("accountsChanged", handleAccountsChanged);
+        }
+      };
+    }
+  }, [disconnect]);
+
   return { account, provider, signer, connect, disconnect };
 };

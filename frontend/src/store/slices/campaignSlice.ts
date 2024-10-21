@@ -32,29 +32,11 @@ const campaignSlice = createSlice({
         state.loading = false;
         state.error = action.error.message || "Failed to fetch campaigns";
       })
-      .addCase(createCampaign.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
       .addCase(createCampaign.fulfilled, (state, action) => {
         state.campaigns.push(action.payload);
-        state.loading = false;
-      })
-      .addCase(createCampaign.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to create campaign";
-      })
-      .addCase(deleteCampaign.pending, (state) => {
-        state.loading = true;
-        state.error = null;
       })
       .addCase(deleteCampaign.fulfilled, (state, action) => {
         state.campaigns = state.campaigns.filter((c) => c.id !== action.payload);
-        state.loading = false;
-      })
-      .addCase(deleteCampaign.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to delete campaign";
       });
   },
 });

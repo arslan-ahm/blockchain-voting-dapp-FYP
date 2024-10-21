@@ -1,20 +1,27 @@
-import { useRef } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 import gsap from "gsap";
+import { useRef, useState } from "react";
 import { useGSAP } from "@gsap/react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Avatar, AvatarImage, AvatarFallback } from "../../components/ui/avatar";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../../components/ui/form";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { getIpfsUrl } from "../../utils/ipfs";
-import { formatDate } from "../../utils/formatters";
+import { formatDate, dateToUnix } from "../../utils/formatters";
 import { Role } from "../../types";
 import { useProfile } from "./useProfile";
-import { VerificationForm } from "../../components/verificationForm/VerificationForm";
+import { VerificationForm } from "../../components/forms/VerificationForm";
+import { ImageUpload } from "../../components/ImageUpload";
+import { cn } from "../../utils/cn";
+import { User } from "lucide-react";
 
 export const Profile = () => {
-  const { user, form, onSubmit, isLoading, isEditable } = useProfile();
+  const { user, form, onSubmit, isLoading, isEditable, hasActiveCampaign } = useProfile();
   const profileRef = useRef<HTMLDivElement>(null);
+  const [activeTab, setActiveTab] = useState("details");
 
   useGSAP(() => {
     gsap.from(profileRef.current, {
@@ -25,180 +32,277 @@ export const Profile = () => {
   }, []);
 
   if (!user.account) {
-    return <div className="text-center text-gray-400">Please connect your wallet</div>;
+    return <div className="text-center text-gray-400 py-12">Please connect your wallet</div>;
+  }
+
+  if (user.role === Role.Admin) {
+    return (
+      <div className="text-center text-gray-400 py-12">
+        Admins cannot manage profiles. Visit the{" "}
+        <a href="/admin" className="text-blue-400 hover:underline">
+          Admin Dashboard
+        </a>.
+      </div>
+    );
   }
 
   return (
-    <div ref={profileRef} className="container mx-auto py-12">
+    <div ref={profileRef} className="container mx-auto py-12 px-4 sm:px-6 lg:px-8">
       <Card className="bg-gray-800 border-gray-700 max-w-2xl mx-auto">
         <CardHeader>
           <CardTitle className="text-2xl text-blue-400 flex items-center gap-4">
             <Avatar className="h-12 w-12">
               <AvatarImage src={user.details?.profileImageIpfsHash ? getIpfsUrl(user.details.profileImageIpfsHash) : undefined} />
-              <AvatarFallback>{user.account.slice(2, 4).toUpperCase()}</AvatarFallback>
+              <AvatarFallback className="bg-gray-700 "><User /></AvatarFallback>
             </Avatar>
             User Profile
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {user.details ? (
-            <div className="space-y-4">
-              <div>
-                <p className="text-gray-200"><strong>Name:</strong> {user.details.name}</p>
-                <p className="text-gray-200"><strong>Email:</strong> {user.details.email}</p>
-                <p className="text-gray-200"><strong>Date of Birth:</strong> {formatDate(user.details.dateOfBirth)}</p>
-                <p className="text-gray-200"><strong>Identity Number:</strong> {user.details.identityNumber}</p>
-                <p className="text-gray-200"><strong>Contact Number:</strong> {user.details.contactNumber}</p>
-                <p className="text-gray-200"><strong>Bio:</strong> {user.details.bio}</p>
-                <p className="text-gray-200"><strong>Role:</strong> {Role[user.role as keyof typeof Role]}</p>
-                {user.details.supportiveLinks.length > 0 && (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2 bg-gray-700">
+              <TabsTrigger value="details" className="text-gray-200">
+                Update Details
+              </TabsTrigger>
+              <TabsTrigger value="verification" className="text-gray-200" disabled={!hasActiveCampaign}>
+                Request Verification
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="details">
+              {user.details ? (
+                <div className="space-y-4">
                   <div>
-                    <strong className="text-gray-200">Supportive Links:</strong>
-                    <ul className="list-disc pl-5">
-                      {user.details.supportiveLinks.map((link: string, index: number) => (
-                        <li key={index} className="text-blue-300">
-                          <a href={link} target="_blank" rel="noopener noreferrer">{link}</a>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-gray-200">
+                      <strong>Name:</strong> {user.details.name}
+                    </p>
+                    <p className="text-gray-200">
+                      <strong>Email:</strong> {user.details.email}
+                    </p>
+                    <p className="text-gray-200">
+                      <strong>Date of Birth:</strong> {formatDate(user.details.dateOfBirth)}
+                    </p>
+                    <p className="text-gray-200">
+                      <strong>Role:</strong> {Object.keys(Role)[user.role]}
+                    </p>
                   </div>
-                )}
-              </div>
-              {isEditable && (
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Name</FormLabel>
-                          <FormControl>
-                            <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Email</FormLabel>
-                          <FormControl>
-                            <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="dateOfBirth"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Date of Birth (Unix timestamp)</FormLabel>
-                          <FormControl>
-                            <Input type="number" className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="identityNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Identity Number</FormLabel>
-                          <FormControl>
-                            <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="contactNumber"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Contact Number</FormLabel>
-                          <FormControl>
-                            <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="bio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Bio</FormLabel>
-                          <FormControl>
-                            <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="profileImage"
-                      render={({ field: { onChange } }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Profile Image</FormLabel>
-                          <FormControl>
-                            <Input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) onChange(file);
-                              }}
-                              className="bg-gray-700 border-gray-600 text-gray-200"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="supportiveLinks"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-gray-200">Supportive Links (comma-separated)</FormLabel>
-                          <FormControl>
-                            <Input
-                              className="bg-gray-700 border-gray-600 text-gray-200"
-                              {...field}
-                              onChange={(e) => field.onChange(e.target.value.split(",").map((link) => link.trim()))}
-                              value={(field.value || []).join(", ")}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="submit"
-                      disabled={isLoading}
-                      className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50"
-                    >
-                      {isLoading ? "Updating..." : "Update Details"}
-                    </Button>
-                  </form>
-                </Form>
+                  {isEditable && (
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="space-y-6 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-gray-200">Full Name</FormLabel>
+                              <FormControl>
+                                <Input
+                                  className={cn(
+                                    "bg-gray-700 border-gray-600 text-gray-200",
+                                    "focus:ring-blue-400 focus:border-blue-400"
+                                  )}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-gray-200">Email</FormLabel>
+                              <FormControl>
+                                <Input
+                                  className={cn(
+                                    "bg-gray-700 border-gray-600 text-gray-200",
+                                    "focus:ring-blue-400 focus:border-blue-400"
+                                  )}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="dateOfBirth"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2 sm:col-span-1">
+                              <FormLabel className="text-gray-200">Date of Birth</FormLabel>
+                              <FormControl>
+                                <DatePicker
+                                  selected={field.value ? new Date(field.value * 1000) : null}
+                                  onChange={(date: Date | null) => field.onChange(date ? dateToUnix(date.toISOString().split("T")[0]) : 0)}
+                                  dateFormat="yyyy-MM-dd"
+                                  placeholderText="Select date"
+                                  maxDate={new Date()}
+                                  minDate={new Date("1900-01-01")}
+                                  showYearDropdown
+                                  scrollableYearDropdown
+                                  className={cn(
+                                    "bg-gray-700 border-gray-600 text-gray-200 w-full rounded-md p-2",
+                                    "focus:ring-blue-400 focus:border-blue-400"
+                                  )}
+                                  wrapperClassName="w-full"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="profileImage"
+                          render={({ field: { onChange } }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-gray-200">Profile Image</FormLabel>
+                              <FormControl>
+                                <ImageUpload
+                                  onChange={onChange}
+                                  preview={user.details?.profileImageIpfsHash ? getIpfsUrl(user.details.profileImageIpfsHash) : undefined}
+                                  className="bg-gray-700 border-gray-600 text-gray-200"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className={cn(
+                            "col-span-2 w-full bg-gradient-to-r from-blue-500 to-purple-500",
+                            "hover:from-blue-600 hover:to-purple-600 disabled:opacity-50",
+                            "mt-4"
+                          )}
+                        >
+                          {isLoading ? "Updating..." : "Update Details"}
+                        </Button>
+                      </form>
+                    </Form>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-gray-400">No details available. Please update your profile.</p>
+                  {isEditable && (
+                    <Form {...form}>
+                      <form
+                        onSubmit={form.handleSubmit(onSubmit)}
+                        className="space-y-6 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0"
+                      >
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-gray-200">Full Name</FormLabel>
+                              <FormControl>
+                                <Input
+                                  className={cn(
+                                    "bg-gray-700 border-gray-600 text-gray-200",
+                                    "focus:ring-blue-400 focus:border-blue-400"
+                                  )}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="email"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-gray-200">Email</FormLabel>
+                              <FormControl>
+                                <Input
+                                  className={cn(
+                                    "bg-gray-700 border-gray-600 text-gray-200",
+                                    "focus:ring-blue-400 focus:border-blue-400"
+                                  )}
+                                  {...field}
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="dateOfBirth"
+                          render={({ field }) => (
+                            <FormItem className="col-span-2 sm:col-span-1">
+                              <FormLabel className="text-gray-200">Date of Birth</FormLabel>
+                              <FormControl>
+                                <DatePicker
+                                  selected={field.value ? new Date(field.value * 1000) : null}
+                                  onChange={(date: Date | null) => field.onChange(date ? dateToUnix(date.toISOString().split("T")[0]) : 0)}
+                                  dateFormat="yyyy-MM-dd"
+                                  placeholderText="Select date"
+                                  maxDate={new Date()}
+                                  minDate={new Date("1900-01-01")}
+                                  showYearDropdown
+                                  scrollableYearDropdown
+                                  className={cn(
+                                    "bg-gray-700 border-gray-600 text-gray-200 w-full rounded-md p-2",
+                                    "focus:ring-blue-400 focus:border-blue-400"
+                                  )}
+                                  wrapperClassName="w-full"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="profileImage"
+                          render={({ field: { onChange } }) => (
+                            <FormItem className="col-span-2">
+                              <FormLabel className="text-gray-200">Profile Image</FormLabel>
+                              <FormControl>
+                                <ImageUpload
+                                  onChange={onChange}
+                                  className="bg-gray-700 border-gray-600 text-gray-200"
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <Button
+                          type="submit"
+                          disabled={isLoading}
+                          className={cn(
+                            "col-span-2 w-full bg-gradient-to-r from-blue-500 to-purple-500",
+                            "hover:from-blue-600 hover:to-purple-600 disabled:opacity-50",
+                            "mt-4"
+                          )}
+                        >
+                          {isLoading ? "Updating..." : "Update Details"}
+                        </Button>
+                      </form>
+                    </Form>
+                  )}
+                </div>
               )}
-              {isEditable && <VerificationForm />}
-            </div>
-          ) : (
-            <p className="text-gray-400">No details available. Please update your profile.</p>
-          )}
+            </TabsContent>
+            <TabsContent value="verification">
+              {hasActiveCampaign ? (
+                <VerificationForm />
+              ) : (
+                <p className="text-gray-400">No active campaigns. Verification requests are disabled.</p>
+              )}
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

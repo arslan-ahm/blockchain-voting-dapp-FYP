@@ -1,6 +1,48 @@
 @import "tailwindcss";
 
 
+.bg-gradient {
+    @apply bg-gradient-to-b from-gray-900 to-gray-800
+}
+
 .gradient-text {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400
+}
+
+/* Custom styles for react-datepicker */
+.react-datepicker {
+  @apply bg-gray-700 border-gray-600 text-gray-200 rounded-md;
+}
+
+.react-datepicker__header {
+  @apply bg-gray-800 text-gray-200 border-b border-gray-600;
+}
+
+.react-datepicker__day,
+.react-datepicker__day-name {
+  @apply text-gray-200;
+}
+
+.react-datepicker__day:hover,
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  @apply bg-blue-500 text-white;
+}
+
+.react-datepicker__triangle {
+  @apply border-b-gray-700;
+}
+
+.react-datepicker__month-container,
+.react-datepicker__year-dropdown {
+  @apply bg-gray-700 text-gray-200;
+}
+
+.react-datepicker__year-option:hover,
+.react-datepicker__month-option:hover {
+  @apply bg-blue-500 text-white;
+}
+
+.react-datepicker__navigation-icon::before {
+  @apply border-gray-200;
 }

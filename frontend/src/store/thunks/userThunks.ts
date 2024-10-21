@@ -4,11 +4,12 @@ import { JsonRpcProvider } from "ethers/providers";
 import { VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI } from "../../constants/contract";
 import { toast } from "sonner";
 import type { UserDetails } from "../../types";
+import type { RootState } from "../store";
 
 export const fetchUserDetails = createAsyncThunk(
   "user/fetchUserDetails",
   async (account: string, { getState }) => {
-    const state = getState() as { user: { provider?: ethers.JsonRpcProvider; signer?: ethers.Signer } };
+    const state = getState() as RootState;
     const provider = state.user.provider || new JsonRpcProvider(import.meta.env.VITE_RPC_URL);
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
 
@@ -34,7 +35,7 @@ export const fetchUserDetails = createAsyncThunk(
 export const updateUserDetails = createAsyncThunk(
   "user/updateUserDetails",
   async (details: UserDetails, { getState }) => {
-    const state = getState() as { user: { signer?: ethers.Signer } };
+    const state = getState() as RootState;
     const signer = state.user.signer;
     if (!signer) throw new Error("Wallet not connected");
 

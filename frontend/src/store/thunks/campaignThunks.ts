@@ -3,9 +3,10 @@ import { ethers } from "ethers";
 import { VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI } from "../../constants/contract";
 import { toast } from "sonner";
 import type { Campaign } from "../../types";
+import type { RootState } from "../store";
 
 export const fetchCampaigns = createAsyncThunk("campaign/fetchCampaigns", async (_, { getState }) => {
-  const state = getState() as { user: { signer: ethers.Signer | null } };
+  const state = getState() as RootState;
   const provider = state.user.signer?.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
   const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
 
@@ -36,7 +37,7 @@ export const fetchCampaigns = createAsyncThunk("campaign/fetchCampaigns", async 
 export const createCampaign = createAsyncThunk(
   "campaign/createCampaign",
   async ({ startDate, endDate, detailsIpfsHash }: { startDate: number; endDate: number; detailsIpfsHash: string }, { getState }) => {
-    const state = getState() as { user: { signer: ethers.Signer | null } };
+    const state = getState() as RootState;
     const signer = state.user.signer;
     if (!signer) throw new Error("Wallet not connected");
 
@@ -58,7 +59,7 @@ export const createCampaign = createAsyncThunk(
 export const deleteCampaign = createAsyncThunk(
   "campaign/deleteCampaign",
   async (campaignId: number, { getState }) => {
-    const state = getState() as { user: { signer: ethers.Signer | null } };
+    const state = getState() as RootState;
     const signer = state.user.signer;
     if (!signer) throw new Error("Wallet not connected");
 

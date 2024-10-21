@@ -1,40 +1,20 @@
+import * as z from "zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { createCampaign, deleteCampaign, fetchCampaigns } from "../../store/thunks/campaignThunks";
 import { fetchVerificationRequests, processVerification } from "../../store/thunks/verificationThunks";
-import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 
-interface CampaignSchema {
-    startDate: number;
-    endDate: number; // Ensure endDate is explicitly required
-    detailsIpfsHash: string;
-    feedback?: string;
-}
-
-interface CampaignSchema {
-    startDate: number;
-    endDate: number;
-    detailsIpfsHash: string;
-    feedback?: string;
-}
-
-interface CampaignSchemaContext {
-    parent: CampaignSchema;
-}
-
-const campaignSchema: z.ZodType<CampaignSchema, z.ZodTypeDef, CampaignSchema> = z.object({
-    startDate: z.number().min(Math.floor(Date.now() / 1000), "Start date must be in the future"),
-    endDate: z.number()
-        .min(Math.floor(Date.now() / 1000), "End date must be valid")
-        .refine((endDate, ctx: z.RefinementCtx & CampaignSchemaContext) => endDate > ctx.parent.startDate, {
-            message: "End date must be after start date",
-        })
-        .transform((value: number) => value as number),
-    detailsIpfsHash: z.string().min(1, "IPFS hash is required"),
-    feedback: z.string().optional(),
-});
+const campaignSchema = z.object({
+  startDate: z.number().min(Math.floor(Date.now() / 1000), "Start date must be in the future"),
+  endDate: z.number(),
+  detailsIpfsHash: z.string().min(1, "IPFS hash is required"),
+  feedback: z.string().optional(),
+}).refine(
+  (data) => data.endDate > data.startDate,
+  { message: "End date must be after start date", path: ["endDate"] }
+);
 
 export const useAdminDashboard = () => {
   const dispatch = useAppDispatch();

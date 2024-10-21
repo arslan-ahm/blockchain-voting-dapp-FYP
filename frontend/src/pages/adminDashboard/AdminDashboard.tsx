@@ -1,7 +1,6 @@
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
 import { useRef } from "react";
-import { useAdminDashboard } from "./useAdminDashboard";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -10,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from ".
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { getIpfsUrl } from "../../utils/ipfs";
 import { formatAddress } from "../../utils/formatters";
-import { Role, type Campaign, type VerificationRequest } from "../../types";
+import { useAdminDashboard } from "./useAdminDashboard";
+import { ROLE } from "../../constants/pages";
 
 export const AdminDashboard = () => {
   const {
@@ -76,11 +76,7 @@ export const AdminDashboard = () => {
                     <FormItem>
                       <FormLabel className="text-gray-200">Details IPFS Hash</FormLabel>
                       <FormControl>
-                        <Input
-                          className="bg-gray-700 border-gray-600 text-gray-200"
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.value)}
-                        />
+                        <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -111,7 +107,7 @@ export const AdminDashboard = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {campaigns.map((campaign: Campaign) => (
+                {campaigns.map((campaign) => (
                   <TableRow key={campaign.id} className="border-gray-700">
                     <TableCell className="text-gray-200">{campaign.id}</TableCell>
                     <TableCell className="text-gray-200">{campaign.isOpen ? "Open" : "Closed"}</TableCell>
@@ -120,6 +116,7 @@ export const AdminDashboard = () => {
                         onClick={() => handleDeleteCampaign(campaign.id)}
                         variant="destructive"
                         className="bg-red-500 hover:bg-red-600"
+                        disabled={!campaign.isOpen || campaign.endDate <= Math.floor(Date.now() / 1000)}
                       >
                         Delete
                       </Button>
@@ -146,10 +143,10 @@ export const AdminDashboard = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {verificationRequests.map((request: VerificationRequest) => (
+              {verificationRequests.map((request) => (
                 <TableRow key={request.userAddress} className="border-gray-700">
                   <TableCell className="text-gray-200">{formatAddress(request.userAddress)}</TableCell>
-                  <TableCell className="text-gray-200">{Role[request.requestedRole]}</TableCell>
+                  <TableCell className="text-gray-200">{ROLE[request.requestedRole]}</TableCell>
                   <TableCell>
                     <a
                       href={getIpfsUrl(request.verificationDocIpfsHash)}
@@ -171,32 +168,25 @@ export const AdminDashboard = () => {
                         </DialogHeader>
                         <Form {...campaignForm}>
                           <form
-                            onSubmit={campaignForm.handleSubmit((values: { feedback: string }) =>
-                              handleProcessVerification(request.userAddress, true, values.feedback)
+                            onSubmit={campaignForm.handleSubmit((values) =>
+                              handleProcessVerification(request.userAddress, true, values.feedback ?? "")
                             )}
                             className="space-y-4"
                           >
                             <FormField
                               control={campaignForm.control}
                               name="feedback"
-                              render={({ field }: { field: { value: string; onChange: (value: string) => void } }) => (
+                              render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-gray-200">Feedback</FormLabel>
                                   <FormControl>
-                                    <Input
-                                      className="bg-gray-700 border-gray-600 text-gray-200"
-                                      value={field.value}
-                                      onChange={(e) => field.onChange(e.target.value)}
-                                    />
+                                    <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
                             />
-                            <Button
-                              type="submit"
-                              className="w-full bg-green-500 hover:bg-green-600"
-                            >
+                            <Button type="submit" className="w-full bg-green-500 hover:bg-green-600">
                               Confirm Approval
                             </Button>
                           </form>
@@ -215,39 +205,25 @@ export const AdminDashboard = () => {
                         </DialogHeader>
                         <Form {...campaignForm}>
                           <form
-                            onSubmit={campaignForm.handleSubmit((values: { feedback: string }) =>
-                              handleProcessVerification(request.userAddress, false, values.feedback)
+                            onSubmit={campaignForm.handleSubmit((values) =>
+                              handleProcessVerification(request.userAddress, false, values.feedback ?? "")
                             )}
                             className="space-y-4"
                           >
                             <FormField
                               control={campaignForm.control}
                               name="feedback"
-                              render={({
-                                field,
-                              }: {
-                                field: {
-                                  value: string;
-                                  onChange: (value: string) => void;
-                                };
-                              }) => (
+                              render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-gray-200">Feedback</FormLabel>
                                   <FormControl>
-                                    <Input
-                                      className="bg-gray-700 border-gray-600 text-gray-200"
-                                      value={field.value}
-                                      onChange={(e) => field.onChange(e.target.value)}
-                                    />
+                                    <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )}
                             />
-                            <Button
-                              type="submit"
-                              className="w-full bg-red-500 hover:bg-red-600"
-                            >
+                            <Button type="submit" className="w-full bg-red-500 hover:bg-red-600">
                               Confirm Rejection
                             </Button>
                           </form>

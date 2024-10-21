@@ -15,7 +15,7 @@ import "./App.css";
 
 const PrivateRoute = ({ children, allowedRoles }: { children: JSX.Element; allowedRoles: Role[] }) => {
   const user = useAppSelector((state) => state.user);
-  return user.account && allowedRoles.includes(user.role) ? children : <Navigate to="/" />;
+  return user.account && allowedRoles.includes(user.role as Role) ? children : <Navigate to="/" />;
 };
 
 function App() {
