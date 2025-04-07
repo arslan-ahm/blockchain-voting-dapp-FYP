@@ -16,7 +16,7 @@ struct UserDetails {
     string contactNumber;
     string bio;
     string profileImageIpfsHash;
-    string[] supportiveLinks;  // Array of links (label,url concatenated with separator)
+    string[] supportiveLinks;
 }
 
 struct VerificationRequest {
@@ -47,8 +47,8 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
     mapping(address => Role) public userRoles;
     mapping(address => VerificationRequest) public verificationRequests;
     mapping(uint256 => Campaign) public campaigns;
-    mapping(address => mapping(uint256 => address)) public votes; // voter -> campaign -> candidate
-    mapping(address => uint256) public candidateVoteCount; // candidate -> total votes
+    mapping(address => mapping(uint256 => address)) public votes;
+    mapping(address => uint256) public candidateVoteCount;
 
     uint256 public nextCampaignId = 1;
     address public admin;
@@ -136,10 +136,9 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
 ) public onlyAdmin {
     require(_endDate > _startDate, "Invalid dates");
     
-    // Check for overlapping campaigns
     for (uint256 i = 1; i < nextCampaignId; i++) {
         Campaign storage existingCampaign = campaigns[i];
-        if (existingCampaign.campaignId != 0) { // Ensure campaign exists
+        if (existingCampaign.campaignId != 0) {
             bool isOverlapping = !(
                 _endDate < existingCampaign.startDate || 
                 _startDate > existingCampaign.endDate
