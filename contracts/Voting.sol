@@ -2,8 +2,8 @@
 pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@chainlink/contracts/src/v0.8/automation/KeeperCompatible.sol";
 
 enum Role { Unverified, Voter, Candidate, Admin, PendingVerification }
 enum RequestStatus { Pending, Approved, Rejected }
@@ -16,7 +16,7 @@ struct UserDetails {
     string contactNumber;
     string bio;
     string profileImageIpfsHash;
-    string[] supportiveLinks;  // Array of links (label,url concatenated with separator)
+    string[] supportiveLinks;
 }
 
 struct VerificationRequest {
@@ -45,8 +45,8 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
     mapping(address => Role) public userRoles;
     mapping(address => VerificationRequest) public verificationRequests;
     mapping(uint256 => Campaign) public campaigns;
-    mapping(address => mapping(uint256 => address)) public votes; // voter -> campaign -> candidate
-    mapping(address => uint256) public candidateVoteCount; // candidate -> total votes
+    mapping(address => mapping(uint256 => address)) public votes;
+    mapping(address => uint256) public candidateVoteCount;
 
     address[] private pendingVerificationRequests;
     uint256 public nextCampaignId = 1;
@@ -164,7 +164,7 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
     // Check for overlapping campaigns
     for (uint256 i = 1; i < nextCampaignId; i++) {
         Campaign storage existingCampaign = campaigns[i];
-        if (existingCampaign.campaignId != 0) { // Ensure campaign exists
+        if (existingCampaign.campaignId != 0) {
             bool isOverlapping = !(
                 _endDate < existingCampaign.startDate || 
                 _startDate > existingCampaign.endDate

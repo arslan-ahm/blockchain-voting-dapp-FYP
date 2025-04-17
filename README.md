@@ -36,7 +36,7 @@ bun install
 bunx hardhat compile
 
 # (Optional) Deploy contracts to local node
-bunx hardhat run scripts/deploy.ts --network localhost
+bun run hardhat ignition deploy ignition/modules/Voting.js --network localhost
 
 # Move to frontend
 cd front-end

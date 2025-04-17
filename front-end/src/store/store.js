@@ -1,8 +1,8 @@
-import { configureStore } from "@reduxjs/toolkit";
-import counterReducer from "./slices/counter";
+import { configureStore } from '@reduxjs/toolkit';
+import votingReducer from './slices/voting.slice';
 
-export default configureStore({
+export const store = configureStore({
   reducer: {
-    counter: counterReducer,
+    voting: votingReducer,
   },
 });
