@@ -1,90 +1,45 @@
-import { Button } from "./ui/button";
-import { useWallet } from "../hooks/useWallet";
-import { setUser, clearUser } from "../store/slices/userSlice";
-import { toast } from "sonner";
-import { useAppDispatch, useAppSelector } from "../hooks/useRedux";
-import { useGSAP } from "@gsap/react";
-import gsap from "gsap";
-import { Wallet, LogOut } from "lucide-react";
-import { useRef } from "react";
+import { Button } from './ui/button';
+import { useWallet } from '../hooks/useWallet';
+import { setUser } from '../store/slices/userSlice';
+import { toast } from 'sonner';
+import { useAppDispatch, useAppSelector } from '../hooks/useRedux';
+import { Wallet } from 'lucide-react';
 
 export const WalletConnect = () => {
-  const { account, provider, signer, connect, disconnect } = useWallet();
+  const { account, connect } = useWallet();
   const dispatch = useAppDispatch();
-  const user = useAppSelector((state) => state.user);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useGSAP(() => {
-    const walletButton = containerRef.current?.querySelector('.wallet-button');
-    if (walletButton) {
-      gsap.fromTo(
-        walletButton,
-        { scale: 0.95, opacity: 0 },
-        { scale: 1, opacity: 1, duration: 0.5, ease: 'back.out(1.7)' }
-      );
-      const walletAddress = containerRef.current?.querySelector('.wallet-address');
-      if (walletAddress) {
-        gsap.fromTo(
-          walletAddress,
-          { y: 20, opacity: 0 },
-          { y: 0, opacity: 1, duration: 0.5, delay: 0.2, ease: 'power2.out' }
-        );
-      }
-    }
-  }, [user.account]);
+  const isConnecting = useAppSelector((state) => state.user.loading);
 
   const handleConnect = async () => {
     try {
       await connect();
-      dispatch(setUser({ account, provider, signer }));
+      dispatch(setUser({ account }));
     } catch (error) {
-      console.error("Failed to connect wallet:", error);
-      toast.error("Failed to connect wallet");
+      console.error('Failed to connect wallet:', error);
+      toast.error('Failed to connect wallet');
     }
   };
 
-  const handleDisconnect = () => {
-    disconnect();
-    dispatch(clearUser());
-    toast.info("Wallet disconnected");
-  };
-
-  // Format address for display
-  const formatAddress = (addr: string) => {
-    return `${addr.substring(0, 6)}...${addr.substring(addr.length - 4)}`;
-  };
-
   return (
-    <div ref={containerRef} className="flex flex-col items-center">
-      <Button
-        variant={user.account ? "outline" : "default"}
-        size="lg"
-        onClick={user.account ? handleDisconnect : handleConnect}
-        className={`wallet-button relative overflow-hidden transition-all duration-300 ${
-          user.account
-            ? 'border-gray-600 text-gray-200 hover:text-blue-400 px-4'
-            : 'bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 px-6'
-        }`}
-      >
+    <Button
+      onClick={handleConnect}
+      disabled={isConnecting}
+      className={`bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 transition-all duration-300 px-6 ${isConnecting ? 'opacity-50 cursor-not-allowed' : ''}`}
+    >
+      {isConnecting ? (
         <span className="flex items-center gap-2">
-          {user.account ? (
-            <>
-              <LogOut size={16} />
-              Disconnect
-            </>
-          ) : (
-            <>
-              <Wallet size={16} />
-              Connect Wallet
-            </>
-          )}
+          <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Connecting...
         </span>
-      </Button>
-      {user.account && (
-        <div className="wallet-address mt-2 text-sm text-gray-400">
-          Connected: {formatAddress(user.account)}
-        </div>
+      ) : (
+        <span className="flex items-center gap-2">
+          <Wallet size={16} />
+          Connect Wallet
+        </span>
       )}
-    </div>
+    </Button>
   );
 };

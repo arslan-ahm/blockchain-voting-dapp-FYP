@@ -20,7 +20,7 @@ export const Home = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800 text-white">
       <section ref={heroRef} className="container mx-auto py-20 text-center">
-        <h1 className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
+        <h1 className="text-5xl py-2 font-bold mb-4 gradient-text">
           Secure, Transparent Voting
         </h1>
         <p className="text-xl text-gray-300 mb-8">
