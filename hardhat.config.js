@@ -1,22 +1,32 @@
+// hardhat.config.js
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ignition-ethers");
 
+/** @type import('hardhat/config').HardhatUserConfig */
 module.exports = {
-  solidity: "0.8.28",
+  solidity: {
+    version: "0.8.24", // or whatever version you're using
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+    },
+  },
   networks: {
     hardhat: {
-      chainId: 1337, 
+      chainId: 31337,
+      // You can configure more settings here if needed
     },
     localhost: {
       url: "http://127.0.0.1:8545",
-      chainId: 1337,
-    },
-    sepolia: {
-      url: "https://rpc.sepolia.org", 
-      accounts: [/* Add your private key or use environment variables */],
+      chainId: 31337,
     },
   },
-  ignition: {
-    strategy: "basic",
+  paths: {
+    sources: "./contracts",
+    tests: "./test",
+    cache: "./cache",
+    artifacts: "./artifacts",
   },
 };

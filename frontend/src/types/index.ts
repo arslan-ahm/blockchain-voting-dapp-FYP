@@ -27,7 +27,7 @@ interface UserDetails {
   supportiveLinks: string[];
 }
 
-interface VerificationRequest {
+export interface VerificationRequest {
   userAddress: string;
   requestedRole: Role;
   status: RequestStatus;
@@ -53,4 +53,4 @@ declare global {
 }
 
 export { Role, RequestStatus };
-export type { UserDetails, VerificationRequest, Campaign };
+export type { UserDetails, Campaign };

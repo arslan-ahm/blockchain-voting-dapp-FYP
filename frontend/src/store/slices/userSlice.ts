@@ -45,8 +45,11 @@ const userSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchUserDetails.fulfilled, (state, action) => {
-        state.details = action.payload.details;
-        state.role = action.payload.role;
+        if (action.payload) {
+          state.details = action.payload.details;
+          state.role = action.payload.role as Role;
+        }
+        console.log("Done 👍")
         state.loading = false;
       })
       .addCase(fetchUserDetails.rejected, (state, action) => {

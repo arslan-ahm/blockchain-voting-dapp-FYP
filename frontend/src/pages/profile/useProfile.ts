@@ -1,3 +1,4 @@
+// src/hooks/useProfile.ts
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -13,7 +14,11 @@ const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
   dateOfBirth: z.number().min(0, "Invalid date"),
+  identityNumber: z.string().min(1, "Identity number is required"),
+  contactNumber: z.string().min(1, "Contact number is required"),
+  bio: z.string().optional(),
   profileImage: z.instanceof(File).optional(),
+  supportiveLinks: z.array(z.string()).optional(),
 });
 
 export const useProfile = () => {
@@ -22,7 +27,31 @@ export const useProfile = () => {
   const user = useAppSelector((state) => state.user);
   const { campaigns } = useAppSelector((state) => state.campaign);
   const isEditable = user.role === Role.Unverified || user.role === Role.PendingVerification;
-  const hasActiveCampaign = campaigns.some((c) => c.isOpen);
+
+  const now = Math.floor(Date.now() / 1000);
+  const upcomingThreshold = 7 * 24 * 60 * 60;
+
+  const relevantCampaign = campaigns
+    .filter((c) => c.isOpen || (c.startDate > now && c.startDate <= now + upcomingThreshold))
+    .sort((a, b) => a.startDate - b.startDate)[0];
+
+  const activeCampaigns = campaigns.filter((c) => c.isOpen);
+  const hasActiveCampaign = activeCampaigns.length > 0;
+  const canUpdateProfile = !!relevantCampaign && isEditable;
+
+  const getCampaignName = async (campaign: typeof relevantCampaign) => {
+    if (!campaign) return "";
+    if (campaign.detailsIpfsHash) {
+      try {
+        const response = await fetch(`https://ipfs.io/ipfs/${campaign.detailsIpfsHash}`);
+        const data = await response.json();
+        return data.name || `Campaign #${campaign.id}`;
+      } catch (error) {
+        console.error("Failed to fetch campaign name from IPFS:", error);
+      }
+    }
+    return `Campaign #${campaign.id}`;
+  };
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -30,13 +59,21 @@ export const useProfile = () => {
       name: user.details?.name || "",
       email: user.details?.email || "",
       dateOfBirth: user.details?.dateOfBirth || 0,
+      identityNumber: user.details?.identityNumber || "",
+      contactNumber: user.details?.contactNumber || "",
+      bio: user.details?.bio || "",
       profileImage: undefined,
+      supportiveLinks: user.details?.supportiveLinks || [],
     },
   });
 
   useEffect(() => {
-    if (user.account) {
-      dispatch(fetchUserDetails(user.account));
+    if (user.account && user.role !== Role.Admin) {
+      console.log("Fetching user details for:", user.account);
+      dispatch(fetchUserDetails(user.account)).then((result) => {
+        const payload = result.payload as { role?: string };
+        console.log("Fetched user:", payload);
+      });
       dispatch(fetchCampaigns());
     }
   }, [user.account, dispatch]);
@@ -47,7 +84,11 @@ export const useProfile = () => {
         name: user.details.name,
         email: user.details.email,
         dateOfBirth: user.details.dateOfBirth,
+        identityNumber: user.details.identityNumber,
+        contactNumber: user.details.contactNumber,
+        bio: user.details.bio,
         profileImage: undefined,
+        supportiveLinks: user.details.supportiveLinks,
       });
     }
   }, [user.details, form]);
@@ -58,25 +99,35 @@ export const useProfile = () => {
       if (values.profileImage) {
         profileImageIpfsHash = await uploadFile(values.profileImage);
       }
+      dispatch(
+        updateUserDetails({
+          name: values.name,
+          email: values.email,
+          dateOfBirth: values.dateOfBirth,
+          identityNumber: values.identityNumber,
+          contactNumber: values.contactNumber,
+          bio: values.bio || "",
+          profileImageIpfsHash,
+          supportiveLinks: values.supportiveLinks || [],
+        })
+      );
       toast.success("Profile updated successfully");
-      console.log("Profile image IPFS hash:", profileImageIpfsHash);
-      // dispatch(
-      //   updateUserDetails({
-      //     name: values.name,
-      //     email: values.email,
-      //     dateOfBirth: values.dateOfBirth,
-      //     identityNumber: user.details?.identityNumber || "",
-      //     contactNumber: user.details?.contactNumber || "",
-      //     bio: user.details?.bio || "",
-      //     profileImageIpfsHash,
-      //     supportiveLinks: user.details?.supportiveLinks || [],
-      //   })
-      // );
     } catch (error) {
       console.error("Failed to update user details:", error);
       toast.error("Failed to update user details");
     }
   };
 
-  return { user, form, onSubmit, isLoading: user.loading, isEditable, hasActiveCampaign };
+  return {
+    user,
+    form,
+    onSubmit,
+    isLoading: user.loading,
+    isEditable,
+    hasActiveCampaign,
+    canUpdateProfile,
+    relevantCampaign,
+    getCampaignName,
+    activeCampaigns,
+  };
 };

@@ -9,11 +9,10 @@ import { Textarea } from "../ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { usePinata } from "../../hooks/usePinata";
 import { requestVerification } from "../../store/thunks/verificationThunks";
-import { Role } from "../../types";
 import { useAppDispatch } from "../../hooks/useRedux";
 import { ImageUpload } from "../ImageUpload";
 import { LinkInput } from "../LinkInput";
-import { cn } from "../../utils/cn";
+import { Role } from "../../types";
 
 const baseSchema = z.object({
   role: z.string().refine((val) => val === String(Role.Voter) || val === String(Role.Candidate), {
@@ -39,7 +38,11 @@ const formSchema = z.discriminatedUnion("role", [
   candidateSchema.extend({ role: z.literal(String(Role.Candidate)) }),
 ]);
 
-export const VerificationForm = () => {
+interface VerificationFormProps {
+  campaignId?: number;
+}
+
+export const VerificationForm = ({ campaignId }: VerificationFormProps) => {
   const dispatch = useAppDispatch();
   const { uploadFile } = usePinata();
   const [isLoading, setLoading] = useState(false);
@@ -59,11 +62,17 @@ export const VerificationForm = () => {
   const selectedRole = form.watch("role");
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
+    if (!campaignId) {
+      form.setError("root", { message: "No active campaign selected" });
+      return;
+    }
+
     try {
       setLoading(true);
       const docIpfsHash = await uploadFile(values.verificationDoc);
       dispatch(
         requestVerification({
+          campaignId,
           role: Number(values.role) as Role,
           docIpfsHash,
           identityNumber: values.identityNumber,

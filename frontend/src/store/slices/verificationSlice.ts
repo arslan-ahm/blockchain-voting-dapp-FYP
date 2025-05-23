@@ -25,7 +25,7 @@ const verificationSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchVerificationRequests.fulfilled, (state, action) => {
-        state.requests = action.payload;
+        state.requests = action.payload as unknown as VerificationRequest[];
         state.status = "fulfilled";
       })
       .addCase(fetchVerificationRequests.rejected, (state, action) => {
