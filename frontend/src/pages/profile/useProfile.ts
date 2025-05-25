@@ -1,10 +1,9 @@
-// src/hooks/useProfile.ts
+
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { fetchUserDetails, updateUserDetails } from "../../store/thunks/userThunks";
-import { fetchCampaigns } from "../../store/thunks/campaignThunks";
+import { updateUserDetails } from "../../store/thunks/userThunks";
 import { usePinata } from "../../hooks/usePinata";
 import { Role } from "../../types";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
@@ -26,11 +25,14 @@ export const useProfile = () => {
   const { uploadFile } = usePinata();
   const user = useAppSelector((state) => state.user);
   const { campaigns } = useAppSelector((state) => state.campaign);
+  
+  
   const isEditable = user.role === Role.Unverified || user.role === Role.PendingVerification;
 
   const now = Math.floor(Date.now() / 1000);
-  const upcomingThreshold = 7 * 24 * 60 * 60;
+  const upcomingThreshold = 7 * 24 * 60 * 60; 
 
+  
   const relevantCampaign = campaigns
     .filter((c) => c.isOpen || (c.startDate > now && c.startDate <= now + upcomingThreshold))
     .sort((a, b) => a.startDate - b.startDate)[0];
@@ -41,6 +43,7 @@ export const useProfile = () => {
 
   const getCampaignName = async (campaign: typeof relevantCampaign) => {
     if (!campaign) return "";
+    
     if (campaign.detailsIpfsHash) {
       try {
         const response = await fetch(`https://ipfs.io/ipfs/${campaign.detailsIpfsHash}`);
@@ -67,17 +70,7 @@ export const useProfile = () => {
     },
   });
 
-  useEffect(() => {
-    if (user.account && user.role !== Role.Admin) {
-      console.log("Fetching user details for:", user.account);
-      dispatch(fetchUserDetails(user.account)).then((result) => {
-        const payload = result.payload as { role?: string };
-        console.log("Fetched user:", payload);
-      });
-      dispatch(fetchCampaigns());
-    }
-  }, [user.account, dispatch]);
-
+  
   useEffect(() => {
     if (user.details) {
       form.reset({
@@ -96,10 +89,14 @@ export const useProfile = () => {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     try {
       let profileImageIpfsHash = user.details?.profileImageIpfsHash || "";
+      
+      
       if (values.profileImage) {
         profileImageIpfsHash = await uploadFile(values.profileImage);
       }
-      dispatch(
+      
+      
+      await dispatch(
         updateUserDetails({
           name: values.name,
           email: values.email,
@@ -110,7 +107,8 @@ export const useProfile = () => {
           profileImageIpfsHash,
           supportiveLinks: values.supportiveLinks || [],
         })
-      );
+      ).unwrap();
+      
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Failed to update user details:", error);

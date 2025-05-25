@@ -1,9 +1,9 @@
+// src/hooks/useStart.ts
 import { useEffect } from "react";
 import { useAppDispatch, useAppSelector } from "./useRedux";
 import { Role } from "../types";
 import { fetchUserDetails } from "../store/thunks/userThunks";
 import { fetchCampaigns } from "../store/thunks/campaignThunks";
-
 
 const useStart = () => {
     const dispatch = useAppDispatch();
@@ -18,12 +18,12 @@ const useStart = () => {
             });
             dispatch(fetchCampaigns());
         }
-    }, []);
+    }, [user.account, user.role, dispatch]); // Fixed: Added missing dependencies
 
     return {
         user,
-    }
-}
-
+        isInitializing: user.loading && !user.details, // Add loading state
+    };
+};
 
 export default useStart;
