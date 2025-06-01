@@ -3,48 +3,204 @@
 @import './styles/sonner.css';
 @import './styles/editor.css';
 
+:root {
+  /* Custom Colors */
+  --background: #0A0A0B;
+  --foreground: #FAFAFA;
+  --card: #1A1A1B;
+  --card-foreground: #FAFAFA;
+  
+  /* Blues */
+  --blue-400: #60A5FA;
+  --blue-500: #3B82F6;
+  --blue-600: #2563EB;
+  
+  /* Purples */
+  --purple-400: #C084FC;
+  --purple-500: #A855F7;
+  --purple-600: #9333EA;
+  
+  /* Pinks */
+  --pink-400: #F472B6;
+  --pink-500: #EC4899;
+  
+  /* Cyans */
+  --cyan-400: #22D3EE;
+  
+  /* Grays */
+  --gray-300: #D1D5DB;
+  --gray-400: #9CA3AF;
+  --gray-500: #6B7280;
+  --gray-600: #4B5563;
+  --gray-700: #374151;
+  --gray-800: #1F2937;
+  --gray-900: #111827;
+  
+  /* Neon Colors */
+  --neon-blue: var(--blue-500);
+  --neon-purple: var(--purple-500);
+  --neon-pink: var(--pink-500);
+  --neon-cyan: var(--cyan-400);
+}
+
+/* Background Gradients */
 .bg-gradient {
-    @apply bg-gradient-to-b from-gray-900 to-gray-800
+  background: linear-gradient(to bottom, var(--gray-900), var(--gray-800));
 }
 
+.bg-gradient-radial {
+  background: radial-gradient(circle at center, var(--tw-gradient-stops));
+}
+
+.bg-gradient-neon {
+  background: linear-gradient(to right, var(--tw-gradient-stops));
+}
+
+/* Text Gradients */
 .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  background-image: linear-gradient(to right, var(--blue-400), var(--purple-400));
 }
 
-/* Custom styles for react-datepicker */
+/* Neon Shadow Effects */
+.shadow-neon-blue {
+  box-shadow: 0 0 5px var(--blue-400), 0 0 20px var(--blue-500);
+}
+
+.shadow-neon-purple {
+  box-shadow: 0 0 5px var(--purple-400), 0 0 20px var(--purple-500);
+}
+
+.shadow-neon-pink {
+  box-shadow: 0 0 5px var(--pink-400), 0 0 20px var(--pink-500);
+}
+
+.shadow-neon-cyan {
+  box-shadow: 0 0 5px var(--cyan-400), 0 0 20px var(--cyan-400);
+}
+
+/* Animations */
+@keyframes pulse-neon {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.9;
+    transform: scale(1.05);
+  }
+}
+
+@keyframes neon-glow {
+  from {
+    box-shadow: 
+      0 0 10px rgba(59, 130, 246, 0.5),
+      0 0 20px rgba(59, 130, 246, 0.3),
+      0 0 30px rgba(59, 130, 246, 0.2),
+      0 0 40px rgba(59, 130, 246, 0.1);
+  }
+  to {
+    box-shadow: 
+      0 0 20px rgba(59, 130, 246, 0.6),
+      0 0 30px rgba(59, 130, 246, 0.4),
+      0 0 40px rgba(59, 130, 246, 0.3),
+      0 0 50px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.animate-pulse-neon {
+  animation: pulse-neon 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+.animate-neon-glow {
+  animation: neon-glow 2s ease-in-out infinite alternate;
+}
+
+/* Card Styles */
+.card {
+  border-radius: 0.5rem;
+  background-color: rgba(31, 41, 55, 0.9);
+  backdrop-filter: blur(8px);
+  position: relative;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  transition: all 0.3s;
+  opacity: 0;
+}
+
+.card:hover::before {
+  box-shadow: 0 0 5px var(--blue-400), 0 0 20px var(--blue-500);
+  opacity: 1;
+}
+
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 0.5rem;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0), rgba(168, 85, 247, 0));
+  transition: all 0.3s;
+  opacity: 0;
+}
+
+.card:hover::after {
+  opacity: 0.1;
+}
+
+/* Custom Blur */
+.blur-xs {
+  backdrop-filter: blur(2px);
+}
+
+/* React Datepicker Custom Styles */
 .react-datepicker {
-  @apply bg-gray-700 border-gray-600 text-gray-200 rounded-md;
+  background-color: var(--gray-700);
+  border-color: var(--gray-600);
+  color: var(--gray-200);
+  border-radius: 0.375rem;
 }
 
 .react-datepicker__header {
-  @apply bg-gray-800 text-gray-200 border-b border-gray-600;
+  background-color: var(--gray-800);
+  color: var(--gray-200);
+  border-bottom: 1px solid var(--gray-600);
 }
 
 .react-datepicker__day,
 .react-datepicker__day-name {
-  @apply text-gray-200;
+  color: var(--gray-200);
 }
 
 .react-datepicker__day:hover,
 .react-datepicker__day--selected,
 .react-datepicker__day--keyboard-selected {
-  @apply bg-blue-500 text-white;
+  background-color: var(--blue-500);
+  color: white;
 }
 
 .react-datepicker__triangle {
-  @apply border-b-gray-700;
+  border-bottom-color: var(--gray-700);
 }
 
 .react-datepicker__month-container,
 .react-datepicker__year-dropdown {
-  @apply bg-gray-700 text-gray-200;
+  background-color: var(--gray-700);
+  color: var(--gray-200);
 }
 
 .react-datepicker__year-option:hover,
 .react-datepicker__month-option:hover {
-  @apply bg-blue-500 text-white;
+  background-color: var(--blue-500);
+  color: white;
 }
 
 .react-datepicker__navigation-icon::before {
-  @apply border-gray-200;
+  border-color: var(--gray-200);
 }

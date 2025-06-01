@@ -55,28 +55,30 @@ export const useAdminDashboard = () => {
 
   const onCreateCampaign = async (values: z.infer<typeof campaignSchema>) => {
     try {
-      let detailsIpfsHash = "";
-      if (values.campaignDocument) {
-        detailsIpfsHash = await uploadFile(values.campaignDocument);
-      } else {
-        const contentWithPlaceholders = replacePlaceholders(
-          values.campaignDetails,
-          values.startDate,
-          values.endDate
-        );
-        const element = document.createElement("div");
-        element.innerHTML = contentWithPlaceholders;
-        const pdfBlob = await html2pdf()
-          .from(element)
-          .set({ margin: 10, filename: "campaign_rules.pdf", jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } })
-          .output("blob");
-        const pdfFile = new File([pdfBlob], "campaign_rules.pdf", { type: "application/pdf" });
-        detailsIpfsHash = await uploadFile(pdfFile);
-      }
+      // let detailsIpfsHash = "";
+      // if (values.campaignDocument) {
+      //   detailsIpfsHash = await uploadFile(values.campaignDocument);
+      // } else {
+      //   const contentWithPlaceholders = replacePlaceholders(
+      //     values.campaignDetails,
+      //     values.startDate,
+      //     values.endDate
+      //   );
+      //   const element = document.createElement("div");
+      //   element.innerHTML = contentWithPlaceholders;
+      //   const pdfBlob = await html2pdf()
+      //     .from(element)
+      //     .set({ margin: 10, filename: "campaign_document.pdf", jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } })
+      //     .output("blob");
+      //   const pdfFile = new File([pdfBlob], "campaign_document.pdf", { type: "application/pdf" });
+      //   detailsIpfsHash = await uploadFile(pdfFile);
+      // }
+
+      console.log("Creating campaign with values:", values);
       dispatch(createCampaign({
         startDate: values.startDate,
         endDate: values.endDate,
-        detailsIpfsHash,
+        detailsIpfsHash: "QmThzXmo7PeugJ9Jnwgc7bZqRe3GJQQsSasXvGExy1Jj88",
       }));
     } catch (error) {
       console.error("Failed to create campaign:", error);

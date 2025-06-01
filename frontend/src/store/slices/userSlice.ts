@@ -1,7 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { Role, type UserDetails } from "../../types";
 import { fetchUserDetails, updateUserDetails } from "../thunks/userThunks";
-import type { ethers } from "ethers";
 
 interface UserState {
   account: string | null;
@@ -9,8 +8,8 @@ interface UserState {
   role: Role;
   loading: boolean;
   error: string | null;
-  provider?: ethers.Provider;
-  signer?: ethers.Signer;
+  providerConnected: boolean;
+  signerConnected: boolean;
 }
 
 const initialState: UserState = {
@@ -19,7 +18,10 @@ const initialState: UserState = {
   role: Role.Unverified,
   loading: false,
   error: null,
+  providerConnected: false,
+  signerConnected: false,
 };
+
 
 const userSlice = createSlice({
   name: "user",
@@ -27,15 +29,23 @@ const userSlice = createSlice({
   reducers: {
     setUser(state, action) {
       state.account = action.payload.account;
-      state.provider = action.payload.provider;
-      state.signer = action.payload.signer;
+      state.providerConnected = !!action.payload.provider;
+      state.signerConnected = !!action.payload.signer;
+      
+      
+      console.log('Redux user updated:', {
+        account: state.account,
+        providerConnected: state.providerConnected,
+        signerConnected: state.signerConnected
+      });
     },
     clearUser(state) {
       state.account = null;
       state.details = null;
       state.role = Role.Unverified;
-      state.provider = undefined;
-      state.signer = undefined;
+      state.providerConnected = false;
+      state.signerConnected = false;
+      
     },
   },
   extraReducers: (builder) => {
@@ -49,7 +59,7 @@ const userSlice = createSlice({
           state.details = action.payload.details;
           state.role = action.payload.role as Role;
         }
-        console.log("Done 👍")
+        console.log("User details fetched successfully 👍")
         state.loading = false;
       })
       .addCase(fetchUserDetails.rejected, (state, action) => {
