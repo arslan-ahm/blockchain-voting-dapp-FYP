@@ -10,6 +10,7 @@ export default defineConfig({
     buffer: true,
   }),],
   define: {
+    'process.env': {},
     global: "globalThis",
   },
   resolve: {
@@ -40,6 +41,13 @@ export default defineConfig({
   build: {
     commonjsOptions: {
       transformMixedEsModules: true,
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+        },
+      },
     },
   },
   // server: {

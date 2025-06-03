@@ -4,13 +4,13 @@ import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 
 export const useCampaignList = () => {
   const dispatch = useAppDispatch();
-  const { campaigns, loading, error } = useAppSelector((state) => state.campaign);
+  const { campaigns, fetchingCampaigns, error } = useAppSelector((state) => state.campaign);
 
   useEffect(() => {
     dispatch(fetchCampaigns());
   }, [dispatch]);
 
-  return { campaigns, loading, error };
+  return { campaigns, fetchingCampaigns, error };
 };
 
 // import { useEffect, useState } from "react";

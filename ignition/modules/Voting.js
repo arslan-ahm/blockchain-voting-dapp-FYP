@@ -3,7 +3,8 @@ const { buildModule } = require("@nomicfoundation/hardhat-ignition/modules");
 
 module.exports = buildModule("VotingModule", (m) => {
   // Get the deployer account (first account from hardhat network)
-  const deployer = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+  // const deployer = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+  const deployer = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
   
   // Deploy the Voting contract with the deployer as the initial owner
   const voting = m.contract("Voting", [deployer], {

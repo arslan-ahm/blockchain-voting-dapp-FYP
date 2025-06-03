@@ -331,7 +331,7 @@ export const Profile = () => {
             </TabsContent>
             <TabsContent value="verification">
               {hasActiveCampaign ? (
-                <VerificationForm campaignId={activeCampaigns[0]?.id} />
+                <VerificationForm campaignId={Number(activeCampaigns[0]?.campaignId)} />
               ) : (
                 <p className="text-gray-400">No active campaigns. Verification requests are disabled.</p>
               )}

@@ -3,7 +3,7 @@ import { Navigate } from "react-router-dom";
 import { Home } from "../pages/home/Home";
 import { Profile } from "../pages/profile/Profile";
 import { CampaignList } from "../pages/campaignList/CampaignList";
-import { AdminDashboard } from "../pages/adminDashboard/AdminDashboard";
+import AdminDashboard from "../pages/adminDashboard/AdminDashboard";
 import { Role } from "../types";
 
 export interface RouteConfig {

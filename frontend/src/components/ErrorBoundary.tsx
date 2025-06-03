@@ -1,46 +1,64 @@
-import React, { Component, type ReactNode } from "react";
+import { Component, type ReactNode } from 'react';
+import { AlertCircle, RefreshCcw } from 'lucide-react';
+import { Button } from './ui/button';
 
-interface ErrorBoundaryProps {
+interface Props {
   children: ReactNode;
+  fallback?: ReactNode;
 }
 
-interface ErrorBoundaryState {
+interface State {
   hasError: boolean;
   error: Error | null;
 }
 
-export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null
+  };
 
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+  public static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("ErrorBoundary caught an error:", error, errorInfo);
-  }
-
-  handleReload = () => {
+  public reset = () => {
     this.setState({ hasError: false, error: null });
   };
 
-  render() {
+  public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
       return (
-        <div className="flex flex-col items-center justify-center min-h-[400px] bg-gray-800 text-white p-6 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-semibold mb-4">Something went wrong</h2>
-          <p className="text-gray-300 mb-6">
-            {this.state.error?.message || "An unexpected error occurred."}
-          </p>
-          <button
-            onClick={this.handleReload}
-            className="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md"
-          >
-            Try Again
-          </button>
+        <div className="min-h-[400px] flex items-center justify-center p-6">
+          <div className="bg-gray-800 border border-gray-700 rounded-lg p-6 max-w-md w-full text-center">
+            <div className="rounded-full bg-red-900/20 p-3 w-fit mx-auto mb-4">
+              <AlertCircle className="w-6 h-6 text-red-500" />
+            </div>
+            <h3 className="text-lg font-medium text-white mb-2">Something went wrong</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              {this.state.error?.message || "An unexpected error occurred"}
+            </p>
+            <div className="flex justify-center gap-3">
+              <Button
+                onClick={() => window.location.reload()}
+                variant="outline"
+                className="gap-2"
+              >
+                <RefreshCcw className="w-4 h-4" />
+                Reload Page
+              </Button>
+              <Button
+                onClick={this.reset}
+                className="gap-2"
+              >
+                Try Again
+              </Button>
+            </div>
+          </div>
         </div>
       );
     }

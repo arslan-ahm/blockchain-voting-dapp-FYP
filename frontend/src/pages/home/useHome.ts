@@ -3,7 +3,6 @@ import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { fetchCampaigns } from "../../store/thunks/campaignThunks";
 import { useWallet } from "../../hooks/useWallet";
 import { initHomeAnimations } from "./home.gsap";
-import type { Campaign } from "../../types";
 
 export const useHome = () => {
   const dispatch = useAppDispatch();
@@ -22,7 +21,7 @@ export const useHome = () => {
     initHomeAnimations();
   }, []);
 
-  const featuredCampaigns: Campaign[] = campaigns.slice(0, 3); // Show top 3 campaigns
+  const featuredCampaigns = campaigns.slice(0, 3); // Show top 3 campaigns
 
   const handleScrollToSection = (sectionId: string) => {
     const element = document.querySelector(sectionId);

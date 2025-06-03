@@ -43,7 +43,7 @@ export const Navbar = () => {
   // Get navigation links based on authentication status and role
   const getAuthenticatedLinks = () => {
     if (userRole === Role.Admin) {
-      return [{ label: 'Admin Dashboard', to: '/admin' }];
+      return [{ label: 'Admin', to: '/admin' }];
     }
     return [
       { label: 'Campaigns', to: '/campaigns' },

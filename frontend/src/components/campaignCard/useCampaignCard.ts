@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { submitVote, registerForCampaign } from "../../store/thunks/voteThunks";
-import { resetVoteStatus } from "../../store/slices/voteSlice";
+import { submitVote, registerForCampaign } from "../../store/thunks/campaignThunks";
+import { resetVoteStatus } from "../../store/slices/campaignSlice";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { Role, type Campaign } from "../../types";
 

@@ -1,9 +1,9 @@
 import { useCampaignList } from "./useCampaignList";
 
 export const CampaignList = () => {
-  const { campaigns, loading, error } = useCampaignList();
+  const { campaigns, fetchingCampaigns, error } = useCampaignList();
 
-  if (loading) return <div className="text-center text-gray-400 py-12">Loading campaigns...</div>;
+  if (fetchingCampaigns) return <div className="text-center text-gray-400 py-12">Loading campaigns...</div>;
   if (error) return <div className="text-center text-red-400 py-12">Error: {error}</div>;
 
   return (
@@ -11,8 +11,8 @@ export const CampaignList = () => {
       <h2 className="text-3xl font-bold mb-8 text-center text-blue-400">Active Campaigns</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {campaigns.map((campaign) => (
-          <div key={campaign.id} className="bg-gray-800 p-4 rounded-lg text-gray-200">
-            <h3>Campaign #{campaign.id}</h3>
+          <div key={campaign.campaignId} className="bg-gray-800 p-4 rounded-lg text-gray-200">
+            <h3>Campaign #{campaign.campaignId}</h3>
             <p>Status: {campaign.isOpen ? "Open" : "Closed"}</p>
             {/* Add more campaign details */}
           </div>
