@@ -27,3 +27,7 @@ export const getLinkDisplayName = (url: string): string => {
     return "Link";
   }
 };
+
+export const formatUnixTimestamp = (timestamp: number): string => {
+  return new Date(timestamp * 1000).toLocaleString();
+};

@@ -1,242 +1,193 @@
-import { useRef } from "react";
-import gsap from "gsap";
-import { useGSAP } from "@gsap/react";
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card";
-import { Button } from "../../components/ui/button";
-import { Input } from "../../components/ui/input";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../../components/ui/form";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
-import { getIpfsUrl } from "../../utils/ipfs";
-import { formatAddress } from "../../utils/formatters";
-import { useAdminDashboard } from "./useAdminDashboard";
-import { ROLE } from "../../constants/pages";
+import { useState } from 'react';
+import { Button } from '../../components/ui/button';
+import { Plus, Trash2, Loader2, Wallet } from 'lucide-react';
+import { useAdminDashboard } from './useAdminDashboard';
+import { CampaignStats } from '../../components/admin/CampaignStats';
+import { CampaignCharts } from '../../components/admin/CampaignCharts';
+import { VerificationRequests } from '../../components/admin/VerificationRequests';
+import { DeleteCampaignDialog } from '../../components/admin/dialogs/DeleteCampaignDialog';
+import { AddCampaignDialog } from '../../components/admin/dialogs/AddCampaignDialog';
+import { EmptyState } from '../../components/admin/EmptyState';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
+import type { Campaign } from '../../types';
 
-export const AdminDashboard = () => {
+const AdminDashboardContent = () => {
   const {
     campaigns,
     verificationRequests,
     campaignForm,
+    isLoading,
+    creatingCampaign,
+    deletingCampaign: isDeletingCampaign,
     onCreateCampaign,
     handleDeleteCampaign,
+    handleCloseCampaign,
     handleProcessVerification,
-    isLoading,
+    isConnected,
+    address,
   } = useAdminDashboard();
-  const dashboardRef = useRef<HTMLDivElement>(null);
 
-  useGSAP(() => {
-    gsap.from(dashboardRef.current, {
-      opacity: 0,
-      y: 50,
-      duration: 1,
-    });
-  }, []);
+  const [showAddCampaign, setShowAddCampaign] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [campaignToDelete, setCampaignToDelete] = useState<Campaign | null>(null);
+
+  // Current active campaign for display
+  const currentCampaign = campaigns.find(c => c.isOpen) || campaigns[0];
+
+  const confirmDeleteCampaign = async (adminAddress: string) => {
+    if (!isConnected) {
+      alert("Please connect your wallet first");
+      return;
+    }
+    if (campaignToDelete) {
+      await handleDeleteCampaign(campaignToDelete.id, adminAddress);
+      setShowDeleteDialog(false);
+      setCampaignToDelete(null);
+    }
+  };
+
+  const handleAddCampaign = async () => {
+    if (!isConnected) {
+      alert("Please connect your wallet first");
+      return;
+    }
+
+    const values = campaignForm.getValues();
+    if (!values.campaignDocument && !values.campaignDetails.trim()) {
+      alert("Contract is required");
+      return;
+    }
+
+    try {
+      await onCreateCampaign(values);
+      setShowAddCampaign(false);
+    } catch (error) {
+      console.error("Failed to create campaign:", error);
+      alert(error instanceof Error ? error.message : "Failed to create campaign");
+    }
+  };
+
+  const handleCloseCurrentCampaign = async () => {
+    if (!isConnected) {
+      alert("Please connect your wallet first");
+      return;
+    }
+    if (currentCampaign) {
+      await handleCloseCampaign(currentCampaign.id);
+    }
+  };
+
+  if (!isConnected) {
+    return (
+      <div className="min-h-screen bg-gray-900 text-white">
+        <div className="container mx-auto px-4 py-8">
+          <EmptyState
+            icon={Wallet}
+            title="Wallet Not Connected"
+            description="Please connect your wallet to access the admin dashboard."
+            className="mt-12"
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div ref={dashboardRef} className="container mx-auto py-12">
-      <h2 className="text-3xl font-bold mb-8 text-center text-blue-400">Admin Dashboard</h2>
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-xl text-blue-400">Create Campaign</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Form {...campaignForm}>
-              <form onSubmit={campaignForm.handleSubmit(onCreateCampaign)} className="space-y-6">
-                <FormField
-                  control={campaignForm.control}
-                  name="startDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-200">Start Date (Unix timestamp)</FormLabel>
-                      <FormControl>
-                        <Input type="number" className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={campaignForm.control}
-                  name="endDate"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-200">End Date (Unix timestamp)</FormLabel>
-                      <FormControl>
-                        <Input type="number" className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={campaignForm.control}
-                  name="detailsIpfsHash"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel className="text-gray-200">Details IPFS Hash</FormLabel>
-                      <FormControl>
-                        <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <Button
-                  type="submit"
-                  disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50"
-                >
-                  {isLoading ? "Creating..." : "Create Campaign"}
-                </Button>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-        <Card className="bg-gray-800 border-gray-700">
-          <CardHeader>
-            <CardTitle className="text-xl text-blue-400">Manage Campaigns</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-gray-700">
-                  <TableHead className="text-gray-200">ID</TableHead>
-                  <TableHead className="text-gray-200">Status</TableHead>
-                  <TableHead className="text-gray-200">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {campaigns.map((campaign) => (
-                  <TableRow key={campaign.id} className="border-gray-700">
-                    <TableCell className="text-gray-200">{campaign.id}</TableCell>
-                    <TableCell className="text-gray-200">{campaign.isOpen ? "Open" : "Closed"}</TableCell>
-                    <TableCell>
-                      <Button
-                        onClick={() => handleDeleteCampaign(campaign.id)}
-                        variant="destructive"
-                        className="bg-red-500 hover:bg-red-600"
-                        disabled={!campaign.isOpen || campaign.endDate <= Math.floor(Date.now() / 1000)}
-                      >
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-      <Card className="bg-gray-800 border-gray-700 mt-8">
-        <CardHeader>
-          <CardTitle className="text-xl text-blue-400">Verification Requests</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-gray-700">
-                <TableHead className="text-gray-200">User</TableHead>
-                <TableHead className="text-gray-200">Role</TableHead>
-                <TableHead className="text-gray-200">Document</TableHead>
-                <TableHead className="text-gray-200">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {verificationRequests.map((request) => (
-                <TableRow key={request.userAddress} className="border-gray-700">
-                  <TableCell className="text-gray-200">{formatAddress(request.userAddress)}</TableCell>
-                  <TableCell className="text-gray-200">{ROLE[request.requestedRole]}</TableCell>
-                  <TableCell>
-                    <a
-                      href={getIpfsUrl(request.verificationDocIpfsHash)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:underline"
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Header */}
+      <div className="border-b border-gray-700 bg-gray-800/50 backdrop-blur-sm sticky top-0 z-40">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <div>
+              <p className="text-gray-400 mt-1">Welcome, Admin</p>
+              <p className="text-sm text-gray-500">{address}</p>
+              {isLoading && (
+                <div className="flex items-center gap-2 text-blue-400">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading...
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setShowAddCampaign(true)}
+                className="bg-blue-600 hover:bg-blue-700 flex items-center gap-2"
+                disabled={creatingCampaign}
+              >
+                {creatingCampaign ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {creatingCampaign ? 'Creating...' : 'Add Campaign'}
+              </Button>
+              {currentCampaign && (
+                <>
+                  <Button 
+                    onClick={() => {
+                      setCampaignToDelete(currentCampaign);
+                      setShowDeleteDialog(true);
+                    }}
+                    className="bg-red-600 hover:bg-red-700 flex items-center gap-2"
+                    disabled={isDeletingCampaign}
+                  >
+                    {isDeletingCampaign ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
+                    {isDeletingCampaign ? 'Deleting...' : 'Delete Campaign'}
+                  </Button>
+                  {currentCampaign.isOpen && (
+                    <Button 
+                      onClick={handleCloseCurrentCampaign}
+                      className="bg-yellow-600 hover:bg-yellow-700 flex items-center gap-2"
                     >
-                      View Document
-                    </a>
-                  </TableCell>
-                  <TableCell className="flex gap-2">
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button className="bg-green-500 hover:bg-green-600">Approve</Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-gray-800 border-gray-700">
-                        <DialogHeader>
-                          <DialogTitle className="text-blue-400">Approve Verification</DialogTitle>
-                        </DialogHeader>
-                        <Form {...campaignForm}>
-                          <form
-                            onSubmit={campaignForm.handleSubmit((values) =>
-                              handleProcessVerification(request.userAddress, true, values.feedback ?? "")
-                            )}
-                            className="space-y-4"
-                          >
-                            <FormField
-                              control={campaignForm.control}
-                              name="feedback"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-gray-200">Feedback</FormLabel>
-                                  <FormControl>
-                                    <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="submit" className="w-full bg-green-500 hover:bg-green-600">
-                              Confirm Approval
-                            </Button>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="destructive" className="bg-red-500 hover:bg-red-600">
-                          Reject
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="bg-gray-800 border-gray-700">
-                        <DialogHeader>
-                          <DialogTitle className="text-blue-400">Reject Verification</DialogTitle>
-                        </DialogHeader>
-                        <Form {...campaignForm}>
-                          <form
-                            onSubmit={campaignForm.handleSubmit((values) =>
-                              handleProcessVerification(request.userAddress, false, values.feedback ?? "")
-                            )}
-                            className="space-y-4"
-                          >
-                            <FormField
-                              control={campaignForm.control}
-                              name="feedback"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-gray-200">Feedback</FormLabel>
-                                  <FormControl>
-                                    <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <Button type="submit" className="w-full bg-red-500 hover:bg-red-600">
-                              Confirm Rejection
-                            </Button>
-                          </form>
-                        </Form>
-                      </DialogContent>
-                    </Dialog>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      Close Campaign
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Campaign Stats */}
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        <CampaignStats campaign={isLoading ? null : currentCampaign} />
+        <CampaignCharts campaign={isLoading ? null : currentCampaign} />
+        <VerificationRequests 
+          requests={isLoading ? [] : verificationRequests}
+          onProcessVerification={handleProcessVerification}
+        />
+      </div>
+
+      {/* Dialogs */}
+      <DeleteCampaignDialog
+        isOpen={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={confirmDeleteCampaign}
+        campaign={campaignToDelete}
+      />
+
+      <AddCampaignDialog
+        isOpen={showAddCampaign}
+        onClose={() => setShowAddCampaign(false)}
+        onConfirm={handleAddCampaign}
+        form={campaignForm}
+        isCreating={creatingCampaign}
+      />
     </div>
   );
 };
+
+const AdminDashboard = () => {
+  return (
+    <ErrorBoundary>
+      <AdminDashboardContent />
+    </ErrorBoundary>
+  );
+};
+
+export default AdminDashboard;

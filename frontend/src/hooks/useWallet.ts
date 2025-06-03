@@ -18,14 +18,27 @@ export const useWallet = () => {
         return;
       }
 
-      const provider = new ethers.BrowserProvider(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum!);
       const accounts = await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
 
       setAccount(accounts[0]);
       setProvider(provider);
       setSigner(signer);
-      dispatch(setUser({ account: accounts[0] }));
+      
+      // FIXED: Only store serializable data in Redux
+      dispatch(setUser({ 
+        account: accounts[0],
+        providerConnected: true,
+        signerConnected: true
+      }));
+      
+      console.log('Wallet connected:', {
+        account: accounts[0],
+        hasProvider: !!provider,
+        hasSigner: !!signer
+      });
+      
       toast.success('Wallet connected');
     } catch (error) {
       toast.error('Failed to connect wallet');
@@ -59,14 +72,26 @@ export const useWallet = () => {
       if (!window.ethereum) return;
 
       try {
-        const provider = new ethers.BrowserProvider(window.ethereum);
+        const provider = new ethers.BrowserProvider(window.ethereum!);
         const accounts = await provider.send('eth_accounts', []);
-        if (accounts.length > 0) {
+        if (accounts.length > 0 && !isLoggedOut) {
           const signer = await provider.getSigner();
           setAccount(accounts[0]);
           setProvider(provider);
           setSigner(signer);
-          dispatch(setUser({ account: accounts[0] }));
+          
+          // FIXED: Only store serializable data in Redux
+          dispatch(setUser({ 
+            account: accounts[0],
+            providerConnected: true,
+            signerConnected: true
+          }));
+          
+          console.log('Auto-connected wallet:', {
+            account: accounts[0],
+            hasProvider: !!provider,
+            hasSigner: !!signer
+          });
         }
       } catch (error) {
         console.error('Failed to check wallet connection:', error);
@@ -78,14 +103,33 @@ export const useWallet = () => {
 
   useEffect(() => {
     if (window.ethereum) {
-      const handleAccountsChanged = (...args: unknown[]) => {
+      const handleAccountsChanged = async (...args: unknown[]) => {
         const accounts = args[0] as string[] | undefined;
         if (!accounts || accounts.length === 0) {
           disconnect();
         } else {
-          setAccount(accounts[0]);
+          // Update with new account
+          try {
+            const provider = new ethers.BrowserProvider(window.ethereum!);
+            const signer = await provider.getSigner();
+            
+            setAccount(accounts[0]);
+            setProvider(provider);
+            setSigner(signer);
+            
+            dispatch(setUser({ 
+              account: accounts[0],
+              providerConnected: true,
+              signerConnected: true
+            }));
+            
+            console.log('Account changed:', accounts[0]);
+          } catch (error) {
+            console.error('Failed to update account:', error);
+          }
         }
       };
+      
       window.ethereum.on("accountsChanged", handleAccountsChanged);
       return () => {
         if (window.ethereum) {
@@ -93,7 +137,10 @@ export const useWallet = () => {
         }
       };
     }
-  }, [disconnect]);
+  }, [disconnect, dispatch]);
 
-  return { account, provider, signer, connect, disconnect };
+  // Export a function to get current signer for use in thunks
+  const getCurrentSigner = useCallback(() => signer, [signer]);
+
+  return { account, provider, signer, connect, disconnect, getCurrentSigner };
 };

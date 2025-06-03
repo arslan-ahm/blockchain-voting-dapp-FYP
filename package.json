@@ -13,8 +13,12 @@
     "util": "^0.12.5"
   },
   "scripts": {
-    "compile": "hardhat compile",
+    "server": "hardhat node",
     "deploy:local": "hardhat ignition deploy ignition/modules/Voting.js --network localhost",
-    "dev": "hardhat node"
+    "deploy:reset": "hardhat ignition deploy ignition/modules/Voting.js --network localhost --reset",
+    "deploy:save": "hardhat run scripts/deploy-and-save.js --network localhost",
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "clean": "hardhat clean"
   }
 }
