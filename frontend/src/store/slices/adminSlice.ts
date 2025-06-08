@@ -53,6 +53,7 @@ interface UserVoteData {
 interface UpkeepData {
   campaignId: number;
   upkeepNeeded: boolean;
+  performData: string;
 }
 
 interface CandidateData {
@@ -643,13 +644,13 @@ const adminSlice = createSlice({
       .addCase(checkUpkeep.fulfilled, (state, action) => {
         state.upkeepData = {
           campaignId: Number(action.payload.performData),
-          upkeepNeeded: action.payload.upkeepNeeded
+          upkeepNeeded: action.payload.upkeepNeeded,
+          performData: action.payload.performData
         };
         state.upkeepLoading = false;
       })
       .addCase(checkUpkeep.rejected, (state, action) => {
-        state.upkeepData = null;
-        state.upkeepLoading = false;
+        state.upkeepData = null;        state.upkeepLoading = false;
         state.error = action.error.message || "Failed to check upkeep";
       })
       

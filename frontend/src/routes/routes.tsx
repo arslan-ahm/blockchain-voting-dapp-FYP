@@ -28,7 +28,7 @@ export const routeConfigs: RouteConfig[] = [
   {
     path: "/campaigns",
     element: <CampaignList />,
-    allowedRoles: [Role.Voter, Role.Candidate, Role.Admin],
+    allowedRoles: [Role.Voter, Role.Candidate, Role.Admin, Role.Unverified, Role.PendingVerification],
     requiresAuth: true,
   },
   {
@@ -43,47 +43,52 @@ export const routeConfigs: RouteConfig[] = [
   },
 ];
 
-
 export const checkRouteAccess = (
   userAccount: string,
   userRole: Role,
   route: RouteConfig
 ): { canAccess: boolean; redirectTo?: string } => {
+  // If route doesn't require authentication, allow access
   if (!route.requiresAuth) {
     return { canAccess: true };
   }
 
+  // If route requires authentication but user is not authenticated, redirect to home
   if (route.requiresAuth && !userAccount) {
     return { canAccess: false, redirectTo: "/" };
   }
 
-  if (!route.allowedRoles) {
-    return { canAccess: true };
+  // If route requires authentication but has no specific role restrictions,
+  // deny access (this prevents unintended access when allowedRoles is undefined)
+  if (route.requiresAuth && !route.allowedRoles) {
+    return { canAccess: false, redirectTo: "/" };
   }
 
-  const hasRoleAccess = route.allowedRoles.includes(userRole);
+  // Check if user's role is in the allowed roles
+  const hasRoleAccess = route.allowedRoles!.includes(userRole);
 
   if (!hasRoleAccess) {
+    // Special case: Admin trying to access profile should go to admin dashboard
     if (route.path === "/profile" && userRole === Role.Admin) {
       return { canAccess: false, redirectTo: "/admin" };
     }
 
+    // Default redirect for unauthorized access
     return { canAccess: false, redirectTo: "/" };
   }
 
   return { canAccess: true };
 };
 
-
 export const getDefaultPathForRole = (userRole: Role): string => {
   switch (userRole) {
     case Role.Admin:
       return "/admin";
     case Role.Voter:
-    case Role.Candidate:
-      return "/campaigns";
-    case Role.Unverified:
+      case Role.Candidate:
+        return "/campaigns";
     case Role.PendingVerification:
+      case Role.Unverified:
       return "/profile";
     default:
       return "/";

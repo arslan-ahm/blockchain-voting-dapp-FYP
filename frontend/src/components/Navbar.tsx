@@ -34,6 +34,7 @@ export const Navbar = () => {
   const { disconnect, account } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
+  const {provider} = useWallet();
 
   // Determine if user is authenticated and get their role
   const isAuthenticated = !!user.account;
@@ -86,11 +87,11 @@ export const Navbar = () => {
   }, [isHomePage, location.state]);
 
   useEffect(() => {
-    if (account && !user.account && user.role !== Role.Admin) {
+    if (account && !user.account && user.role !== Role.Admin && provider) {
       console.log("Wallet connected, fetching user details for:", account);
-      dispatch(fetchUserDetails(account));
+      dispatch(fetchUserDetails({account, provider}));
     }
-  }, [account, dispatch, user.account, user.role]);
+  }, [account, dispatch, user.account, user.role, provider]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -126,7 +127,7 @@ export const Navbar = () => {
         isScrolled ? "py-3" : "py-5"
       )}
     >
-      <div className="container mx-auto flex items-center justify-between">
+      <div className="max-w-[1540px] container mx-auto flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2">
           <div className="relative w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse flex items-center justify-center">
             <Vote className="w-5 h-5 text-white" />

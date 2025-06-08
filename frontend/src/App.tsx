@@ -5,6 +5,7 @@ import { Toaster } from "./components/ui/sonner";
 import useStart from "./hooks/useStart";
 import './App.css';
 import { AppRoutes } from "./routes/AppRoutes";
+import Footer from "./components/Footer";
 
 function App() {
   const { isInitializing } = useStart();
@@ -23,8 +24,11 @@ function App() {
     <ThemeProvider defaultTheme="dark">
       <Router>
         <Navbar />
+        <main className="min-h-[45vh]">
         <AppRoutes />
+        </main>
         <Toaster position="top-right" />
+        <Footer />
       </Router>
     </ThemeProvider>
   );

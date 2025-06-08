@@ -34,6 +34,7 @@ import {
   selectClosingCampaign
 } from "../../store/slices/adminSlice";
 import { fetchAdminDashboardData } from "../../store/thunks/adminThunks";
+import type { ethers } from "ethers";
 
 const campaignSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -89,6 +90,8 @@ export const useAdminDashboard = () => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<number | null>(null);
+  const { signer } = useWallet();
+  const { signerConnected, providerConnected } = useAppSelector(store=> store.user);
 
   const campaignForm = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
@@ -105,9 +108,8 @@ export const useAdminDashboard = () => {
 
   useEffect(() => {
     dispatch(fetchCampaigns());
-    dispatch(fetchVerificationRequests());
+    dispatch(fetchVerificationRequests({provider: provider as ethers.Provider}));
     dispatch(fetchAdminDashboardData());
-    dispatch(checkUpkeep());
   }, [dispatch]);
 
   useEffect(() => {
@@ -149,11 +151,18 @@ export const useAdminDashboard = () => {
       setIsUploading(false);
     }
   };
+  
   const onCreateCampaign = async (values: CampaignFormData) => {
     try {
       // Enhanced wallet connection validation
-      if (!account || !provider) {
+      if (!account || !provider || !signer) {
         toast.error("Please connect your wallet first");
+        return;
+      }
+  
+      // Check Redux state for connection status as well
+      if (!signerConnected || !providerConnected) {
+        toast.error("Wallet not properly connected. Please reconnect.");
         return;
       }
   
@@ -199,14 +208,15 @@ export const useAdminDashboard = () => {
         return;
       }
   
-      // Dispatch with explicit account parameter
+      // Dispatch with signer parameter (required for new implementation)
       await dispatch(createCampaign({
         title: values.title,
         description: values.description,
         startDate: values.startDate,
         endDate: values.endDate,
-        campaignDetailsIpfsHash: detailsIpfsHash,
-        account: account // Pass the connected account
+        campaignDetailsIpfsHash: "",
+        account: account, // Pass the connected account
+        signer: signer // Pass the signer from useWallet hook
       })).unwrap();
   
       campaignForm.reset();
@@ -214,7 +224,7 @@ export const useAdminDashboard = () => {
   
       try {
         await Promise.all([
-          dispatch(fetchCampaigns()).unwrap(),
+          dispatch(fetchCampaigns(provider)).unwrap(), // Pass provider if fetchCampaigns needs it
           dispatch(fetchAdminDashboardData()).unwrap()
         ]);
       } catch (refreshError) {
@@ -238,9 +248,13 @@ export const useAdminDashboard = () => {
 
   const handleDeleteCampaign = async (campaignId: number, account: string) => {
     try {
+      if (!signer) {
+        throw new Error("Wallet not connected");
+      }
       await dispatch(deleteCampaign({
         campaignId,
-        adminAddress: account
+        adminAddress: account,
+        signer
       })).unwrap();
       toast.success("Campaign deleted successfully");
 
@@ -261,24 +275,30 @@ export const useAdminDashboard = () => {
 
   const handleCloseCampaign = async (campaignId: number) => {
     try {
-      await dispatch(manualCloseCampaign(campaignId)).unwrap();
+      if (!signer) {
+        throw new Error('Wallet is not connected');
+      }
+      await dispatch(manualCloseCampaign({campaignId, signer})).unwrap();
       toast.success("Campaign closed successfully");
 
       dispatch(fetchCampaigns());
       dispatch(fetchAdminDashboardData());
     } catch (error) {
       console.error("Failed to close campaign:", error);
-      toast.error("Failed to close campaign");
+      toast.error(error instanceof Error ? error.message : "Failed to close campaign");
     }
   };
 
   // Verification management
   const handleProcessVerification = async (userAddress: string, approved: boolean, feedback: string = "") => {
     try {
-      await dispatch(processVerification({ userAddress, approved, feedback })).unwrap();
+      if (!signer) {
+        throw new Error("Wallet not connected");
+      }
+      await dispatch(processVerification({ userAddress, approved, feedback, signer })).unwrap();
       toast.success(`Verification request ${approved ? 'approved' : 'rejected'} successfully`);
 
-      dispatch(fetchVerificationRequests());
+      dispatch(fetchVerificationRequests({provider: provider as ethers.Provider}));
       dispatch(fetchAdminDashboardData());
     } catch (error) {
       console.error("Failed to process verification:", error);
@@ -293,12 +313,21 @@ export const useAdminDashboard = () => {
       return;
     }
     try {
-      await dispatch(performUpkeep(upkeepData.campaignId.toString())).unwrap();
+      if (!signer) {
+      throw new Error("Wallet not connected");
+    }
+    await dispatch(performUpkeep({
+      performData: upkeepData.performData || "0x",
+      signer
+    })).unwrap();
       toast.success("Campaign upkeep performed successfully");
 
       dispatch(fetchCampaigns());
       dispatch(fetchAdminDashboardData());
-      dispatch(checkUpkeep());
+      if (!provider) {
+        throw new Error("Provider not connected");
+      }
+      dispatch(checkUpkeep({provider}));
     } catch (error) {
       console.error("Failed to perform upkeep:", error);
       toast.error("Failed to perform upkeep");
@@ -489,8 +518,8 @@ export const useAdminDashboard = () => {
     refreshDashboard: () => {
       dispatch(fetchCampaigns());
       dispatch(fetchAdminDashboardData());
-      dispatch(fetchVerificationRequests());
-      dispatch(checkUpkeep());
+      dispatch(fetchVerificationRequests({provider: provider as ethers.Provider}));
+      dispatch(checkUpkeep({provider: provider as ethers.Provider}));
     }
   };
 };

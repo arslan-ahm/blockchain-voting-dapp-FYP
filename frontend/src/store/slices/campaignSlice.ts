@@ -20,7 +20,7 @@ import {
   getMonthlyCampaigns
 } from "../thunks/campaignThunks";
 
-interface CampaignDetails {
+export interface CampaignDetails {
   campaignId: string;
   startDate: string;
   endDate: string;

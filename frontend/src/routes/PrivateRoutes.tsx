@@ -1,7 +1,7 @@
 import type { JSX } from "react";
 import { Navigate } from "react-router-dom";
 import { useAppSelector } from "../hooks/useRedux";
-import { checkRouteAccess, type RouteConfig } from "../config/routes";
+import { checkRouteAccess, type RouteConfig } from "./routes";
 
 interface PrivateRouteProps {
     children: JSX.Element;

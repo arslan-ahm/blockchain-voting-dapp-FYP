@@ -6,10 +6,9 @@ import type { RootState } from "../store";
 
 export const fetchCampaigns = createAsyncThunk(
   "campaign/fetchCampaigns",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const nextCampaignId = await contract.nextCampaignId();
@@ -65,10 +64,12 @@ export const fetchCampaigns = createAsyncThunk(
 
 export const fetchNearbyCampaigns = createAsyncThunk(
   "campaign/fetchNearbyCampaigns",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    
+    // Use provided provider or fallback to RPC URL
+    // Since provider is no longer in Redux state, we need it passed or use fallback
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const campaignIds = await contract.getNearbyCampaigns();
@@ -113,6 +114,7 @@ export const fetchNearbyCampaigns = createAsyncThunk(
 
       return campaigns;
     } catch (error) {
+      console.error("Error fetching nearby campaigns:", error);
       toast.error("Failed to fetch nearby campaigns");
       throw error;
     }
@@ -127,7 +129,8 @@ export const createCampaign = createAsyncThunk(
     campaignDetailsIpfsHash,
     title,
     description,
-    account
+    account,
+    signer // Add signer as a required parameter
   }: {
     startDate: number;
     endDate: number;
@@ -135,6 +138,7 @@ export const createCampaign = createAsyncThunk(
     title: string;
     description: string;
     account?: string; // Make optional
+    signer: ethers.Signer; // Add signer parameter
   }, { getState }) => {
     const state = getState() as RootState;
     const userAccount = account || state.user.account;
@@ -143,26 +147,24 @@ export const createCampaign = createAsyncThunk(
     if (!userAccount) {
       throw new Error("Wallet not connected - No account found");
     }
-
-    // Try to get signer from state first, if not available, create from provider
-    let signer = state.user.signer;
     
-    if (!signer && state.user.provider) {
-      try {
-        // Create signer from provider if not in state
-        signer = state.user.signer;
-      } catch (error) {
-        console.error("Failed to get signer from provider:", error);
-        throw new Error("Failed to get wallet signer");
-      }
+    // Check if wallet is connected via Redux state
+    if (!state.user.signerConnected) {
+      throw new Error("Wallet not connected - Signer not available");
     }
+    
+    console.log("Step 5", signer);
     
     if (!signer) {
-      throw new Error("Wallet not connected - No signer available");
+      throw new Error("Wallet not connected - No signer provided");
     }
-
+    
+    console.log("Step 6");
+    console.log("Signer:", signer);
+    
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
-
+    console.log("Contract:", contract);
+    
     try {
       // Note: Remove userAccount from contract call as it's not in the Solidity function
       const tx = await contract.createCampaign(
@@ -173,8 +175,8 @@ export const createCampaign = createAsyncThunk(
         description
         // Remove userAccount - it's not a parameter in the smart contract function
       );
-      
       const receipt = await tx.wait();
+      console.log("Receipt:", receipt);
       toast.success("Campaign created successfully");
       
       let campaignId = null;
@@ -194,7 +196,7 @@ export const createCampaign = createAsyncThunk(
           continue;
         }
       }
-
+      console.log("Campaign ID:", campaignId);
       return {
         transactionHash: receipt.hash,
         campaignId,
@@ -222,7 +224,6 @@ export const createCampaign = createAsyncThunk(
         } else if (error.message.includes("insufficient funds")) {
           errorMessage = "Insufficient funds for transaction";
         } else {
-          // Include the actual error message for debugging
           errorMessage = `Failed to create campaign: ${error.message}`;
         }
       }
@@ -237,15 +238,13 @@ export const deleteCampaign = createAsyncThunk(
   "campaign/deleteCampaign",
   async ({
     campaignId,
-    adminAddress
+    adminAddress,
+    signer
   }: {
     campaignId: number;
     adminAddress: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
-    if (!signer) throw new Error("Wallet not connected");
-
+    signer: ethers.Signer;
+  }) => {
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
 
     try {
@@ -266,10 +265,9 @@ export const deleteCampaign = createAsyncThunk(
 
 export const getActiveCampaign = createAsyncThunk(
   "campaign/getActiveCampaign",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const activeCampaignId = await contract.getActiveCampaignId();
@@ -317,10 +315,9 @@ export const getActiveCampaign = createAsyncThunk(
 
 export const hasActiveCampaign = createAsyncThunk(
   "campaign/hasActiveCampaign",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const hasActive = await contract.hasActiveCampaign();
@@ -344,11 +341,7 @@ export const hasActiveCampaign = createAsyncThunk(
 
 export const registerForCampaign = createAsyncThunk(
   "campaign/registerForCampaign",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
-    if (!signer) throw new Error("Wallet not connected");
-
+  async ({campaignId, signer}: {campaignId: number, signer: ethers.Signer}) => {
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
 
     try {
@@ -369,16 +362,9 @@ export const registerForCampaign = createAsyncThunk(
 
 export const checkUserRegistration = createAsyncThunk(
   "campaign/checkUserRegistration",
-  async ({
-    campaignId,
-    userAddress
-  }: {
-    campaignId: number;
-    userAddress: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({campaignId, userAddress, provider}: {campaignId: number, userAddress: string, provider: ethers.Provider}) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const [isVoter, isCandidate] = await contract.isUserRegisteredForCampaign(campaignId, userAddress);
@@ -400,14 +386,15 @@ export const getCandidateVotes = createAsyncThunk(
   "campaign/getCandidateVotes",
   async ({
     campaignId,
-    candidate
+    candidate,
+    provider
   }: {
     campaignId: number;
     candidate: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const votes = await contract.getCandidateVotes(campaignId, candidate);
@@ -426,10 +413,9 @@ export const getCandidateVotes = createAsyncThunk(
 
 export const getAllCandidateVotes = createAsyncThunk(
   "campaign/getAllCandidateVotes",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({campaignId, provider}: {campaignId: number, provider: ethers.Provider}) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const [candidates, names, voteCounts] = await contract.getCampaignCandidates(campaignId);
@@ -455,13 +441,13 @@ export const castVote = createAsyncThunk(
   "campaign/castVote",
   async ({
     campaignId,
-    candidate
+    candidate,
+    signer
   }: {
     campaignId: number;
     candidate: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+    signer: ethers.Signer;
+  }) => {
     if (!signer) throw new Error("Wallet not connected");
 
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
@@ -487,14 +473,15 @@ export const getUserVote = createAsyncThunk(
   "campaign/getUserVote",
   async ({
     campaignId,
-    userAddress
+    userAddress,
+    provider
   }: {
     campaignId: number;
     userAddress: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const votedCandidate = await contract.votes(userAddress, campaignId);
@@ -513,9 +500,7 @@ export const getUserVote = createAsyncThunk(
 
 export const manualCloseCampaign = createAsyncThunk(
   "campaign/manualCloseCampaign",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+  async ({campaignId, signer}: {campaignId: number, signer: ethers.Signer}) => {
     if (!signer) throw new Error("Wallet not connected");
 
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
@@ -538,10 +523,9 @@ export const manualCloseCampaign = createAsyncThunk(
 
 export const checkUpkeep = createAsyncThunk(
   "campaign/checkUpkeep",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({provider}: {provider: ethers.Provider}) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const [upkeepNeeded, performData] = await contract.checkUpkeep("0x");
@@ -559,9 +543,7 @@ export const checkUpkeep = createAsyncThunk(
 
 export const performUpkeep = createAsyncThunk(
   "campaign/performUpkeep",
-  async (performData: string, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+  async ({performData, signer}: {performData: string, signer: ethers.Signer}) => {
     if (!signer) throw new Error("Wallet not connected");
 
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
@@ -584,10 +566,9 @@ export const performUpkeep = createAsyncThunk(
 
 export const getCampaignStats = createAsyncThunk(
   "campaign/getCampaignStats",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({campaignId, provider}: {campaignId: number, provider: ethers.Provider}) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const [totalVoters, votedCount, notVotedCount] = await contract.getVotingStats(campaignId);
@@ -610,10 +591,9 @@ export const getCampaignStats = createAsyncThunk(
 
 export const getCampaignVoters = createAsyncThunk(
   "campaign/getCampaignVoters",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({campaignId, provider}: {campaignId: number, provider: ethers.Provider}) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const [voters, names, hasVotedList] = await contract.getCampaignVoters(campaignId);
@@ -637,10 +617,9 @@ export const getCampaignVoters = createAsyncThunk(
 
 export const getMonthlyCampaigns = createAsyncThunk(
   "campaign/getMonthlyCampaigns",
-  async (month: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({month, provider}: {month: number, provider: ethers.Provider}) => {
+    const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
       const [campaignIds, startDates, endDates, titles, statuses, winners] =

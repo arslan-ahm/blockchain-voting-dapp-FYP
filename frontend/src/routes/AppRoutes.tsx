@@ -1,6 +1,6 @@
 import { Routes, Route } from "react-router-dom";
 import { PrivateRoute } from "./PrivateRoutes";
-import { routeConfigs } from "../config/routes";
+import { routeConfigs } from "./routes";
 
 export const AppRoutes = () => {
   return (

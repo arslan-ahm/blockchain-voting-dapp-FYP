@@ -22,6 +22,8 @@ export const useWallet = () => {
       const accounts = await provider.send('eth_requestAccounts', []);
       const signer = await provider.getSigner();
 
+      console.log("Step 0 - Connected signer:", signer);
+
       setAccount(accounts[0]);
       setProvider(provider);
       setSigner(signer);
@@ -117,6 +119,7 @@ export const useWallet = () => {
             setProvider(provider);
             setSigner(signer);
             
+            // FIXED: Only store serializable data in Redux
             dispatch(setUser({ 
               account: accounts[0],
               providerConnected: true,

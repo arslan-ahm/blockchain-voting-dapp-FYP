@@ -1,3 +1,4 @@
+import { ErrorBoundary } from "../../components/ErrorBoundary";
 import { useCampaignList } from "./useCampaignList";
 
 export const CampaignList = () => {
@@ -10,6 +11,7 @@ export const CampaignList = () => {
     <div className="container mx-auto py-12">
       <h2 className="text-3xl font-bold mb-8 text-center text-blue-400">Active Campaigns</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <ErrorBoundary>
         {campaigns.map((campaign) => (
           <div key={campaign.campaignId} className="bg-gray-800 p-4 rounded-lg text-gray-200">
             <h3>Campaign #{campaign.campaignId}</h3>
@@ -17,6 +19,7 @@ export const CampaignList = () => {
             {/* Add more campaign details */}
           </div>
         ))}
+        </ErrorBoundary>
       </div>
     </div>
   );

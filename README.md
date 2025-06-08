@@ -35,8 +35,9 @@ bun install
 # Compile smart contracts (optional if ABI is already available)
 bunx hardhat compile
 
-# (Optional) Deploy contracts to local node
-bun run hardhat ignition deploy ignition/modules/Voting.js --network localhost
+bun run server
+
+bun run deploy:local
 
 # Move to frontend
 cd front-end

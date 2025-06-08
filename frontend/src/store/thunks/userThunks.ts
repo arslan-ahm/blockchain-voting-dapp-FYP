@@ -3,11 +3,10 @@ import { ethers } from "ethers";
 import { VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI } from "../../constants/contract";
 import { toast } from "sonner";
 import type { UserDetails } from "../../types";
-import type { RootState } from "../store";
 
 export const fetchUserDetails = createAsyncThunk(
   "user/fetchUserDetails",
-  async (account: string, { getState, rejectWithValue }) => {
+  async ({account, provider}: {account: string, provider: ethers.Provider}, { rejectWithValue }) => {
     try {
       if (!account || !ethers.isAddress(account)) {
         throw new Error(`Invalid account address: ${account}`);
@@ -38,27 +37,6 @@ export const fetchUserDetails = createAsyncThunk(
       }
       if (!userDetailsLockedFunction) {
         throw new Error("isUserDetailsLocked() function not found in ABI");
-      }
-
-      let provider: ethers.JsonRpcProvider;
-      const state = getState() as RootState;
-
-      if (state.user.provider) {
-        if (state.user.provider instanceof ethers.JsonRpcProvider) {
-          provider = state.user.provider;
-        } else {
-          const rpcUrl = import.meta.env.VITE_RPC_URL;
-          if (!rpcUrl) {
-            throw new Error("VITE_RPC_URL environment variable not set");
-          }
-          provider = new ethers.JsonRpcProvider(rpcUrl);
-        }
-      } else {
-        const rpcUrl = import.meta.env.VITE_RPC_URL;
-        if (!rpcUrl) {
-          throw new Error("VITE_RPC_URL environment variable not set");
-        }
-        provider = new ethers.JsonRpcProvider(rpcUrl);
       }
 
       try {
@@ -217,10 +195,8 @@ export const fetchUserDetails = createAsyncThunk(
 
 export const updateUserDetails = createAsyncThunk(
   "user/updateUserDetails",
-  async (details: UserDetails, { getState, rejectWithValue }) => {
+  async ({details, signer}: {details: UserDetails, signer: ethers.Signer}, { rejectWithValue }) => {
     try {
-      const state = getState() as RootState;
-      const signer = state.user.signer;
       if (!signer) throw new Error("Wallet not connected");
 
       const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
@@ -272,13 +248,8 @@ export const updateUserDetails = createAsyncThunk(
 
 export const requestVerification = createAsyncThunk(
   "user/requestVerification",
-  async (
-    { role, verificationDocHash }: { role: number; verificationDocHash: string },
-    { getState, rejectWithValue }
-  ) => {
+  async ({ role, verificationDocHash, signer }: { role: number; verificationDocHash: string, signer: ethers.Signer }, { rejectWithValue }) => {
     try {
-      const state = getState() as RootState;
-      const signer = state.user.signer;
       if (!signer) throw new Error("Wallet not connected");
 
       const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
@@ -315,29 +286,9 @@ export const requestVerification = createAsyncThunk(
 
 export const fetchNearbyCampaigns = createAsyncThunk(
   "user/fetchNearbyCampaigns",
-  async (_, { getState, rejectWithValue }) => {
+  async ({ provider }: { provider: ethers.Provider }, { rejectWithValue }) => {
     try {
-      const state = getState() as RootState;
-      let provider: ethers.JsonRpcProvider;
-
-      if (state.user.provider) {
-        if (state.user.provider instanceof ethers.JsonRpcProvider) {
-          provider = state.user.provider;
-        } else {
-          const rpcUrl = import.meta.env.VITE_RPC_URL;
-          if (!rpcUrl) {
-            throw new Error("VITE_RPC_URL environment variable not set");
-          }
-          provider = new ethers.JsonRpcProvider(rpcUrl);
-        }
-      } else {
-        const rpcUrl = import.meta.env.VITE_RPC_URL;
-        if (!rpcUrl) {
-          throw new Error("VITE_RPC_URL environment variable not set");
-        }
-        provider = new ethers.JsonRpcProvider(rpcUrl);
-      }
-
+      if (!provider) throw new Error("Provider not connected");
       const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
       
       const campaignIds = await contract.getNearbyCampaigns();
@@ -377,13 +328,11 @@ export const fetchNearbyCampaigns = createAsyncThunk(
 
 export const registerForCampaign = createAsyncThunk(
   "user/registerForCampaign",
-  async (campaignId: number, { getState, rejectWithValue }) => {
+  async ({campaignId, provider}: {campaignId: number, provider: ethers.Provider}, { rejectWithValue }) => {
     try {
-      const state = getState() as RootState;
-      const signer = state.user.signer;
-      if (!signer) throw new Error("Wallet not connected");
+      if (!provider) throw new Error("Provider not connected");
 
-      const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+      const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
 
       const tx = await contract.registerForCampaign(campaignId);
       await tx.wait();
