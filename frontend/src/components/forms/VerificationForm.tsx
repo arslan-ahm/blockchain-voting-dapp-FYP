@@ -1,157 +1,83 @@
-import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
+import React from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
-import { usePinata } from "../../hooks/usePinata";
-import { requestVerification } from "../../store/thunks/verificationThunks";
-import { useAppDispatch } from "../../hooks/useRedux";
-import { ImageUpload } from "../ImageUpload";
-import { LinkInput } from "../LinkInput";
-import { Role } from "../../types";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "../ui/form";
+import { DocumentUpload } from "../DocumentUpload";
+import type { UseFormReturn } from "react-hook-form";
+import { Plus, X } from "lucide-react";
+import { cn } from "../../utils/cn";
+import type { VerificationFormData } from "../../pages/profile/useProfile";
 
-const baseSchema = z.object({
-  role: z.string().refine((val) => val === String(Role.Voter) || val === String(Role.Candidate), {
-    message: "Invalid role",
-  }),
-  verificationDoc: z.instanceof(File, { message: "Verification document is required" }),
-  identityNumber: z.string().min(1, "Identity number is required"),
-  contactNumber: z.string().min(1, "Contact number is required"),
-});
-
-const voterSchema = baseSchema.extend({
-  bio: z.string().optional(),
-  supportiveLinks: z.array(z.string()).optional(),
-});
-
-const candidateSchema = baseSchema.extend({
-  bio: z.string().min(1, "Bio is required for candidates"),
-  supportiveLinks: z.array(z.string()).min(1, "At least one supportive link is required for candidates"),
-});
-
-const formSchema = z.discriminatedUnion("role", [
-  voterSchema.extend({ role: z.literal(String(Role.Voter)) }),
-  candidateSchema.extend({ role: z.literal(String(Role.Candidate)) }),
-]);
-
-interface VerificationFormProps {
-  campaignId?: number;
+interface VerificationRequestFormProps {
+  form: UseFormReturn<VerificationFormData>;
+  onSubmit: (values: VerificationFormData) => Promise<void>;
+  isLoading: boolean;
+  supportiveLinks: string[];
+  addSupportiveLink: () => void;
+  removeSupportiveLink: (index: number) => void;
+  updateSupportiveLink: (index: number, value: string) => void;
 }
 
-export const VerificationForm = ({ campaignId }: VerificationFormProps) => {
-  const dispatch = useAppDispatch();
-  const { uploadFile } = usePinata();
-  const [isLoading, setLoading] = useState(false);
-
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      role: String(Role.Voter),
-      verificationDoc: undefined,
-      identityNumber: "",
-      contactNumber: "",
-      bio: "",
-      supportiveLinks: [],
-    },
-  });
-
-  const selectedRole = form.watch("role");
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
-    if (!campaignId) {
-      form.setError("root", { message: "No active campaign selected" });
-      return;
-    }
-
-    try {
-      setLoading(true);
-      const docIpfsHash = await uploadFile(values.verificationDoc);
-      dispatch(
-        requestVerification({
-          campaignId,
-          role: Number(values.role) as Role,
-          docIpfsHash,
-          identityNumber: values.identityNumber,
-          contactNumber: values.contactNumber,
-          bio: values.bio || "",
-          supportiveLinks: values.supportiveLinks || [],
-        })
-      );
-      form.reset();
-    } catch (error) {
-      console.error("Failed to request verification:", error);
-      form.setError("verificationDoc", { message: "Failed to upload document" });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export const VerificationRequestForm: React.FC<VerificationRequestFormProps> = ({
+  form,
+  onSubmit,
+  isLoading,
+  supportiveLinks,
+  addSupportiveLink,
+  removeSupportiveLink,
+  updateSupportiveLink,
+}) => {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Role Selection */}
         <FormField
           control={form.control}
-          name="role"
+          name="requestedRole"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Requested Role</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value}>
-                <FormControl>
-                  <SelectTrigger className="bg-gray-700 border-gray-600 text-gray-200">
-                    <SelectValue placeholder="Select role" />
-                  </SelectTrigger>
-                </FormControl>
-                <SelectContent className="bg-gray-700 border-gray-600 text-gray-200">
-                  <SelectItem value={String(Role.Voter)}>Voter</SelectItem>
-                  <SelectItem value={String(Role.Candidate)}>Candidate</SelectItem>
-                </SelectContent>
-              </Select>
+              <FormLabel className="text-gray-200">Requested Role *</FormLabel>
+              <div className="flex gap-3">
+                <SelectBadge
+                  onChange={() => field.onChange("Voter")}
+                  value={field.value}
+                  label="Voter"
+                />
+                <SelectBadge
+                  onChange={() => field.onChange("Candidate")}
+                  value={field.value}
+                  label="Candidate"
+                />
+              </div>
               <FormMessage />
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="identityNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-gray-200">Identity Number</FormLabel>
-              <FormControl>
-                <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-        <FormField
-          control={form.control}
-          name="contactNumber"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-gray-200">Contact Number</FormLabel>
-              <FormControl>
-                <Input className="bg-gray-700 border-gray-600 text-gray-200" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+
+        {/* Bio Field */}
         <FormField
           control={form.control}
           name="bio"
           render={({ field }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">
-                Bio {selectedRole === String(Role.Candidate) && <span className="text-red-400">*</span>}
-              </FormLabel>
+              <FormLabel className="text-gray-200">Bio</FormLabel>
               <FormControl>
                 <Textarea
-                  className="bg-gray-700 border-gray-600 text-gray-200 h-32"
-                  placeholder="Tell us about yourself"
+                  placeholder="Tell us about yourself and why you're applying for this role..."
+                  rows={4}
+                  className={cn(
+                    "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400",
+                    "focus:ring-blue-400 focus:border-blue-400",
+                    "transition-colors duration-200 resize-none"
+                  )}
                   {...field}
                 />
               </FormControl>
@@ -159,33 +85,62 @@ export const VerificationForm = ({ campaignId }: VerificationFormProps) => {
             </FormItem>
           )}
         />
-        <FormField
-          control={form.control}
-          name="supportiveLinks"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel className="text-gray-200">
-                Supportive Links {selectedRole === String(Role.Candidate) && <span className="text-red-400">*</span>}
-              </FormLabel>
-              <FormControl>
-                <LinkInput
-                  value={field.value || []}
-                  onChange={field.onChange}
-                  className="bg-gray-700 border-gray-600 text-gray-200"
+
+        {/* Supportive Links Field */}
+        <div>
+          <FormLabel className="text-gray-200 mb-3 block">
+            Supportive Links
+          </FormLabel>
+          <div className="space-y-3">
+            {supportiveLinks.map((link, index) => (
+              <div key={index} className="flex gap-2">
+                <Input
+                  placeholder="https://example.com"
+                  value={link}
+                  onChange={(e) => updateSupportiveLink(index, e.target.value)}
+                  className={cn(
+                    "bg-gray-700 border-gray-600 text-gray-200 placeholder-gray-400",
+                    "focus:ring-blue-400 focus:border-blue-400",
+                    "transition-colors duration-200"
+                  )}
                 />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                {supportiveLinks.length > 1 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => removeSupportiveLink(index)}
+                    className="border-gray-600 text-gray-400 hover:text-red-400 hover:border-red-400"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addSupportiveLink}
+              className="border-gray-600 text-gray-400 hover:text-blue-400 hover:border-blue-400"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Link
+            </Button>
+          </div>
+        </div>
+
+        {/* Document Upload - At the bottom */}
         <FormField
           control={form.control}
-          name="verificationDoc"
+          name="verificationDocument"
           render={({ field: { onChange } }) => (
             <FormItem>
-              <FormLabel className="text-gray-200">Verification Document</FormLabel>
+              <FormLabel className="text-gray-200">
+                Verification Document
+              </FormLabel>
               <FormControl>
-                <ImageUpload
+                <DocumentUpload
                   onChange={onChange}
                   className="bg-gray-700 border-gray-600 text-gray-200"
                 />
@@ -194,14 +149,55 @@ export const VerificationForm = ({ campaignId }: VerificationFormProps) => {
             </FormItem>
           )}
         />
-        <Button
-          type="submit"
-          disabled={isLoading}
-          className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50"
-        >
-          {isLoading ? "Submitting..." : "Request Verification"}
-        </Button>
+
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-3 pt-4">
+          <Button
+            type="submit"
+            disabled={isLoading}
+            className={cn(
+              "flex-1 bg-gradient-to-r from-blue-500 to-purple-500",
+              "hover:from-blue-600 hover:to-purple-600 disabled:opacity-50",
+              "transition-all duration-200 text-white font-medium py-2 px-4 rounded-md",
+              "disabled:cursor-not-allowed"
+            )}
+          >
+            {isLoading ? (
+              <div className="flex items-center justify-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Submitting...
+              </div>
+            ) : (
+              "Submit Verification Request"
+            )}
+          </Button>
+        </div>
       </form>
     </Form>
+  );
+};
+
+const SelectBadge = ({
+  onChange,
+  value,
+  label,
+}: {
+  onChange: (value: string) => void;
+  value: string;
+  label: string;
+}) => {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(label)}
+      className={cn(
+        "px-3 py-1 rounded-full cursor-pointer text-sm font-medium transition-all duration-200 border-2",
+        value === label
+          ? "bg-blue-500/20 border-blue-700 text-blue-400 shadow-lg"
+          : "bg-gray-700 border-gray-600 text-gray-300 hover:bg-gray-600 hover:border-gray-500"
+      )}
+    >
+      {label}
+    </button>
   );
 };
