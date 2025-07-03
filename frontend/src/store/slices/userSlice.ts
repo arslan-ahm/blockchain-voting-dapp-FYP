@@ -10,6 +10,8 @@ import {
 
 interface Campaign {
   id: number;
+  title: string;
+  description: string;
   startDate: number;
   endDate: number;
   winner: string;

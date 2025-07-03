@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { ArrowDown, ChevronRight } from "lucide-react";
 import { features, steps, roadmapItems } from "./home.constants";
+import GradientText from "../../components/GradientText";
 
 export const Home = () => {
   const { 
@@ -22,9 +23,7 @@ export const Home = () => {
         <div className="container mx-auto text-center relative z-10">
           <h1 className="hero-title text-4xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
             Secure Voting on the <br />
-            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Blockchain
-            </span>
+            <GradientText text="Blockchain" />
           </h1>
           
           <p className="hero-description text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-8">

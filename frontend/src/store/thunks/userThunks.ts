@@ -299,6 +299,8 @@ export const fetchNearbyCampaigns = createAsyncThunk(
           const campaignDetails = await contract.getCampaignDetails(campaignId);
           campaigns.push({
             id: Number(campaignId),
+            title: campaignDetails.title,
+            description: campaignDetails.description,
             startDate: Number(campaignDetails.startDate),
             endDate: Number(campaignDetails.endDate),
             winner: campaignDetails.winner,

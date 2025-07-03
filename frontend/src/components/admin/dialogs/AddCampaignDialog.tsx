@@ -19,7 +19,7 @@ interface CampaignFormData {
 interface AddCampaignDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: () => Promise<void>;
+  onSubmit: (data: CampaignFormData) => Promise<string | number | undefined>;
   form: UseFormReturn<CampaignFormData>;
   isCreating: boolean;
 }
@@ -27,12 +27,16 @@ interface AddCampaignDialogProps {
 export const AddCampaignDialog = ({ 
   isOpen, 
   onClose, 
-  onConfirm, 
+  onSubmit, 
   form,
   isCreating 
 }: AddCampaignDialogProps) => {
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const [dateError, setDateError] = useState<string>("");
+  
+  const handleSubmit = form.handleSubmit((data) => {
+    return onSubmit(data);
+  });
 
   const handleUploadContract = (file: File) => {
     form.setValue('campaignDocument', file);
@@ -57,25 +61,31 @@ export const AddCampaignDialog = ({
 
   // Validate dates when they change
   useEffect(() => {
-    const startDate = form.watch('startDate');
-    const endDate = form.watch('endDate');
+    const subscription = form.watch((_, { name }) => {
+      if (name !== 'startDate' && name !== 'endDate') return;
+      
+      const startDate = form.getValues('startDate');
+      const endDate = form.getValues('endDate');
 
-    if (startDate && endDate) {
-      const startDateTime = new Date(startDate * 1000);
-      const endDateTime = new Date(endDate * 1000);
-      const now = new Date();
+      if (startDate && endDate) {
+        const startDateTime = new Date(startDate * 1000);
+        const endDateTime = new Date(endDate * 1000);
+        const now = new Date();
 
-      if (startDateTime <= now) {
-        setDateError("Start date must be in the future");
-      } else if (endDateTime <= startDateTime) {
-        setDateError("End date must be after start date");
-      } else if ((endDateTime.getTime() - startDateTime.getTime()) < (24 * 60 * 60 * 1000)) {
-        setDateError("Campaign must run for at least 24 hours");
-      } else {
-        setDateError("");
+        if (startDateTime <= now) {
+          setDateError("Start date must be in the future");
+        } else if (endDateTime <= startDateTime) {
+          setDateError("End date must be after start date");
+        } else if ((endDateTime.getTime() - startDateTime.getTime()) < (24 * 60 * 60 * 1000)) {
+          setDateError("Campaign must run for at least 24 hours");
+        } else {
+          setDateError("");
+        }
       }
-    }
-  }, [form.watch('startDate'), form.watch('endDate')]);
+    });
+    
+    return () => subscription.unsubscribe();
+  }, [form]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -163,7 +173,7 @@ export const AddCampaignDialog = ({
           </div>
           <div className="flex gap-3 pt-4">
             <Button
-              onClick={onConfirm}
+              onClick={handleSubmit}
               className="flex-1"
               disabled={isCreating || !!dateError}
             >

@@ -1,222 +1,124 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { Campaign } from "../../types";
+import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
+import type { 
+  AdminDashboardData,
+  VerificationRequestData,
+  CampaignState,
+  UserVote,
+} from '../../types';
 import { 
-  fetchCampaigns, 
-  fetchNearbyCampaigns,
-  createCampaign, 
-  deleteCampaign, 
-  getActiveCampaign,
-  hasActiveCampaign,
-  registerForCampaign,
-  checkUserRegistration,
-  getCandidateVotes,
-  getAllCandidateVotes,
-  castVote,
-  getUserVote,
-  manualCloseCampaign,
-  checkUpkeep,
-  performUpkeep
-} from "../thunks/campaignThunks";
-import {
   fetchAdminDashboardData,
+  selectCampaign,
+  fetchAllCampaignIds,
   adminCreateCampaign,
   adminDeleteCampaign,
   adminManualCloseCampaign,
   adminProcessVerification,
-  getVerificationRequestDetails
+  getVerificationRequestDetails,
+  fetchVerificationRequests
 } from "../thunks/adminThunks";
+import { getStatusAsNumber } from '../../utils/helpers';
 
-interface UserRegistration {
-  campaignId: number;
-  userAddress: string;
-  isVoter: boolean;
-  isCandidate: boolean;
-}
-
-interface CandidateVoteData {
-  campaignId: number;
-  candidateAddress: string;
-  votes: number;
-}
-
-interface CampaignVoteData {
-  campaignId: number;
-  candidateVotes: { [address: string]: number };
-}
-
-interface UserVoteData {
-  campaignId: number;
-  userAddress: string;
-  votedFor: string | null;
-}
-
-interface UpkeepData {
-  campaignId: number;
-  upkeepNeeded: boolean;
-  performData: string;
-}
-
-interface CandidateData {
-  address: string;
-  name: string;
-  voteCount: number;
-  role: string;
-}
-
-interface VoterData {
-  address: string;
-  name: string;
-  hasVoted: boolean;
-  role: string;
-}
-
-export interface VerificationRequestData {
-  userAddress: string;
-  requestedRole: number;
-  verificationDocIpfsHash: string;
-  adminFeedback: string;
-  userName: string;
-  timestamp: number;
-  status: number;
-}
-
-interface AdminDashboardData {
-  currentCampaign: {
+interface AdminState extends CampaignState {
+  adminDashboard: AdminDashboardData | null;
+  adminLoading: boolean;
+  adminError: string | null;
+  verificationRequests: VerificationRequestData[];
+  verificationError: string | null;
+  processingVerification: boolean;
+  selectedCampaignId: number;
+  campaignList: Array<{
     id: number;
     title: string;
-    description: string;
-    startDate: number;
-    endDate: number;
-    duration: number;
-    winner: string;
-    isOpen: boolean;
-    status: 'Upcoming' | 'Active' | 'Completed' | 'Deleted';
-    detailsIpfsHash: string;
-    creationTimestamp?: number;
-  } | null;
-  
-  participantStats: {
-    candidateCount: number;
+    description?: string;
+    status: number;
+    startDate?: number;
+    endDate?: number;
+  }>;
+  loading: boolean;
+  stats: {
+    campaignId: number;
+    totalVotes: number;
     voterCount: number;
-  };
-  
-  voteStats: {
+    candidateCount: number;
     votedCount: number;
     notVotedCount: number;
     totalVoters: number;
   };
-  
-  monthlyCampaigns: {
-    campaignIds: number[];
-    titles: string[];
-    startDates: number[];
-    endDates: number[];
-    statuses: string[];
-    winners: string[];
-  };
-  
-  candidates: CandidateData[];
-  voters: VoterData[];
-  verificationRequests: VerificationRequestData[];
-  totalCampaigns: number;
-  activeCampaigns: number;
-  completedCampaigns: number;
-}
-
-interface CampaignState {
-  campaigns: Campaign[];
-  nearbyCampaigns: Campaign[];
-  activeCampaign: Campaign | null;
-  hasActive: boolean;
-  loading: boolean;
-  error: string | null;
-  
-  // Registration related state
-  registrationLoading: boolean;
-  registrationError: string | null;
-  userRegistrations: UserRegistration[];
-  
-  // Voting related state
-  votingLoading: boolean;
-  votingError: string | null;
-  candidateVotes: CandidateVoteData[];
-  campaignVotes: CampaignVoteData[];
-  userVotes: UserVoteData[];
-  
-  // Upkeep related state
-  upkeepData: UpkeepData | null;
-  upkeepLoading: boolean;
-  
-  // Admin dashboard state
-  adminDashboard: AdminDashboardData | null;
-  adminLoading: boolean;
-  adminError: string | null;
-  
-  // Verification state
-  verificationRequests: VerificationRequestData[];
-  verificationLoading: boolean;
-  verificationError: string | null;
-  
-  // UI state
-  fetchingNearby: boolean;
-  closingCampaign: boolean;
-  deletingCampaign: boolean;
+  candidates: string[];
+  voters: string[];
   creatingCampaign: boolean;
-  checkingRegistration: boolean;
-  fetchingVotes: boolean;
-  processingVerification: boolean;
+  deletingCampaign: boolean;
+  closingCampaign: boolean;
+  fetchingVerificationRequests: boolean;
+  fetchingVerificationDetails: boolean;
+  selectedVerificationRequest: VerificationRequestData | null;
 }
 
-const initialState: CampaignState = {
+const initialState: AdminState = {
+  status: 'idle',
+  error: null,
   campaigns: [],
   nearbyCampaigns: [],
   activeCampaign: null,
-  hasActive: false,
-  loading: false,
-  error: null,
-  
-  registrationLoading: false,
-  registrationError: null,
-  userRegistrations: [],
-  
-  votingLoading: false,
-  votingError: null,
+  voteStatus: 'idle',
+  registrationStatus: 'idle',
   candidateVotes: [],
-  campaignVotes: [],
+  userRegistrations: [],
   userVotes: [],
-  
-  upkeepData: null,
-  upkeepLoading: false,
-  
+  campaignVoters: {},
+  campaignStats: {},
+  monthlyCampaigns: [],
+  hasActiveCampaign: false,
+  activeCampaignId: '',
+  transactionHash: null,
+  upkeepNeeded: false,
+  performData: null,
+  currentCampaign: null,
+  loading: false,
+  stats: {
+    campaignId: 0,
+    totalVotes: 0,
+    voterCount: 0,
+    candidateCount: 0,
+    votedCount: 0,
+    notVotedCount: 0,
+    totalVoters: 0
+  },
+  candidates: [],
+  voters: [],
+  fetchingCampaigns: false,
+  fetchingNearbyCampaigns: false,
+  fetchingActiveCampaign: false,
+  fetchingVotes: false,
+  fetchingRegistration: false,
+  fetchingStats: false,
+  fetchingVoters: false,
+  fetchingMonthlyCampaigns: false,
+  castingVote: false,
+  performingUpkeep: false,
+  checkingUpkeep: false,
   adminDashboard: null,
   adminLoading: false,
   adminError: null,
-  
   verificationRequests: [],
-  verificationLoading: false,
   verificationError: null,
-  
-  fetchingNearby: false,
-  closingCampaign: false,
-  deletingCampaign: false,
-  creatingCampaign: false,
-  checkingRegistration: false,
-  fetchingVotes: false,
   processingVerification: false,
+  selectedCampaignId: 0,
+  campaignList: [],
+  creatingCampaign: false,
+  deletingCampaign: false,
+  closingCampaign: false,
+  fetchingVerificationRequests: false,
+  fetchingVerificationDetails: false,
+  selectedVerificationRequest: null,
 };
 
-const adminSlice = createSlice({
-  name: "admin",
+export const adminSlice = createSlice({
+  name: 'admin',
   initialState,
   reducers: {
     clearError: (state) => {
       state.error = null;
-    },
-    clearRegistrationError: (state) => {
-      state.registrationError = null;
-    },
-    clearVotingError: (state) => {
-      state.votingError = null;
     },
     clearAdminError: (state) => {
       state.adminError = null;
@@ -224,9 +126,7 @@ const adminSlice = createSlice({
     clearVerificationError: (state) => {
       state.verificationError = null;
     },
-    resetCampaignState: () => {
-      return initialState;
-    },
+    resetAdminState: () => initialState,
     updateCampaignStatus: (state, action: PayloadAction<{ campaignId: number; isOpen: boolean; winner?: string }>) => {
       const { campaignId, isOpen, winner } = action.payload;
       
@@ -258,7 +158,7 @@ const adminSlice = createSlice({
         // If campaign is closed, it's no longer active
         if (!isOpen) {
           state.activeCampaign = null;
-          state.hasActive = false;
+          state.hasActiveCampaign = false;
         }
       }
       
@@ -273,7 +173,7 @@ const adminSlice = createSlice({
         }
       }
     },
-    updateUserVote: (state, action: PayloadAction<UserVoteData>) => {
+    updateUserVote: (state, action: PayloadAction<UserVote>) => {
       const existingIndex = state.userVotes.findIndex(
         vote => vote.campaignId === action.payload.campaignId && 
                 vote.userAddress === action.payload.userAddress
@@ -285,423 +185,38 @@ const adminSlice = createSlice({
         state.userVotes.push(action.payload);
       }
     },
+    setSelectedCampaign: (state, action: PayloadAction<number>) => {
+      state.selectedCampaignId = action.payload;
+    },
+    removeVerificationRequest: (state, action: PayloadAction<string>) => {
+      state.verificationRequests = state.verificationRequests.filter(
+        req => req.userAddress !== action.payload
+      );
+      if (state.adminDashboard) {
+        state.adminDashboard.verificationRequests = state.adminDashboard.verificationRequests.filter(
+          req => req.userAddress !== action.payload
+        );
+      }
+    },
+    setSelectedVerificationRequest: (state, action: PayloadAction<VerificationRequestData | null>) => {
+      state.selectedVerificationRequest = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
-      // Fetch all campaigns
-      .addCase(fetchCampaigns.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(fetchCampaigns.fulfilled, (state, action) => {
-        state.campaigns = action.payload.map(campaign => ({
-          ...campaign,
-          id: campaign.campaignId,
-          voters: [],
-          candidates: []
-        }));
-        state.loading = false;
-        state.error = null;
-      })
-      .addCase(fetchCampaigns.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to fetch campaigns";
-      })
-      
-      // Fetch nearby campaigns
-      .addCase(fetchNearbyCampaigns.pending, (state) => {
-        state.fetchingNearby = true;
-        state.error = null;
-      })
-      .addCase(fetchNearbyCampaigns.fulfilled, (state, action) => {
-        state.nearbyCampaigns = action.payload.map(campaign => ({
-          ...campaign,
-          id: campaign.campaignId,
-          voters: [],
-          candidates: []
-        }));
-        state.fetchingNearby = false;
-        state.error = null;
-      })
-      .addCase(fetchNearbyCampaigns.rejected, (state, action) => {
-        state.fetchingNearby = false;
-        state.error = action.error.message || "Failed to fetch nearby campaigns";
-      })
-      
-      // Create campaign
-      .addCase(createCampaign.pending, (state) => {
-        state.creatingCampaign = true;
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(createCampaign.fulfilled, (state, action) => {
-        const newCampaign: Campaign = {
-          id: Number(action.payload.campaignId),
-          startDate: Number(action.payload.startDate),
-          endDate: Number(action.payload.endDate),
-          winner: "",
-          isOpen: true,
-          detailsIpfsHash: action.payload.campaignDetailsIpfsHash,
-          voters: [],
-          candidates: []
-        };
-        state.campaigns.push(newCampaign);
-        state.activeCampaign = newCampaign;
-        state.hasActive = true;
-        state.creatingCampaign = false;
-        state.loading = false;
-        state.error = null;
-      })
-      .addCase(createCampaign.rejected, (state, action) => {
-        state.creatingCampaign = false;
-        state.loading = false;
-        state.error = action.payload as string || "Failed to create campaign";
-      })
-      
-      // Delete campaign
-      .addCase(deleteCampaign.pending, (state) => {
-        state.deletingCampaign = true;
-        state.error = null;
-      })
-      .addCase(deleteCampaign.fulfilled, (state, action) => {
-        const campaignId = Number(action.payload.campaignId);
-        state.campaigns = state.campaigns.filter((c) => c.id !== campaignId);
-        state.nearbyCampaigns = state.nearbyCampaigns.filter((c) => c.id !== campaignId);
-        
-        // Clean up related data
-        state.userRegistrations = state.userRegistrations.filter(reg => reg.campaignId !== campaignId);
-        state.candidateVotes = state.candidateVotes.filter(vote => vote.campaignId !== campaignId);
-        state.campaignVotes = state.campaignVotes.filter(vote => vote.campaignId !== campaignId);
-        state.userVotes = state.userVotes.filter(vote => vote.campaignId !== campaignId);
-        
-        if (state.activeCampaign?.id === campaignId) {
-          state.activeCampaign = null;
-          state.hasActive = false;
-        }
-        
-        state.deletingCampaign = false;
-        state.error = null;
-      })
-      .addCase(deleteCampaign.rejected, (state, action) => {
-        state.deletingCampaign = false;
-        state.error = action.payload as string || "Failed to delete campaign";
-      })
-      
-      // Get active campaign
-      .addCase(getActiveCampaign.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
-      .addCase(getActiveCampaign.fulfilled, (state, action) => {
-        if (action.payload) {
-          state.activeCampaign = {
-            id: Number(action.payload.campaignId),
-            startDate: Number(action.payload.startDate),
-            endDate: Number(action.payload.endDate),
-            winner: action.payload.winner,
-            isOpen: action.payload.isOpen,
-            detailsIpfsHash: action.payload.detailsIpfsHash,
-            voters: [],
-            candidates: []
-          };
-          state.hasActive = true;
-        } else {
-          state.activeCampaign = null;
-          state.hasActive = false;
-        }
-        state.loading = false;
-        state.error = null;
-      })
-      .addCase(getActiveCampaign.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to get active campaign";
-      })
-      
-      // Check if has active campaign
-      .addCase(hasActiveCampaign.pending, () => {
-        // Optional: add loading state if needed
-      })
-      .addCase(hasActiveCampaign.fulfilled, (state, action) => {
-        state.hasActive = action.payload.hasActiveCampaign;
-        if (!action.payload.hasActiveCampaign) {
-          state.activeCampaign = null;
-        }
-      })
-      .addCase(hasActiveCampaign.rejected, (state, action) => {
-        state.error = action.error.message || "Failed to check active campaign";
-      })
-      
-      // Register for campaign
-      .addCase(registerForCampaign.pending, (state) => {
-        state.registrationLoading = true;
-        state.registrationError = null;
-      })
-      .addCase(registerForCampaign.fulfilled, (state) => {
-        state.registrationLoading = false;
-        state.registrationError = null;
-      })
-      .addCase(registerForCampaign.rejected, (state, action) => {
-        state.registrationLoading = false;
-        state.registrationError = action.payload as string || "Failed to register for campaign";
-      })
-      
-      // Check user registration
-      .addCase(checkUserRegistration.pending, (state) => {
-        state.checkingRegistration = true;
-      })
-      .addCase(checkUserRegistration.fulfilled, (state, action) => {
-        const existingIndex = state.userRegistrations.findIndex(
-          reg => reg.campaignId === action.payload.campaignId && 
-                 reg.userAddress === action.payload.userAddress
-        );
-        
-        if (existingIndex !== -1) {
-          state.userRegistrations[existingIndex] = action.payload;
-        } else {
-          state.userRegistrations.push(action.payload);
-        }
-        
-        state.checkingRegistration = false;
-      })
-      .addCase(checkUserRegistration.rejected, (state, action) => {
-        state.checkingRegistration = false;
-        state.error = action.error.message || "Failed to check user registration";
-      })
-      
-      // Get candidate votes
-      .addCase(getCandidateVotes.pending, (state) => {
-        state.fetchingVotes = true;
-      })
-      .addCase(getCandidateVotes.fulfilled, (state, action) => {
-        const candidateVoteData: CandidateVoteData = {
-          campaignId: action.payload.campaignId,
-          candidateAddress: action.payload.candidate,
-          votes: Number(action.payload.votes)
-        };
-        
-        const existingIndex = state.candidateVotes.findIndex(
-          vote => vote.campaignId === candidateVoteData.campaignId && 
-                  vote.candidateAddress === candidateVoteData.candidateAddress
-        );
-        
-        if (existingIndex !== -1) {
-          state.candidateVotes[existingIndex] = candidateVoteData;
-        } else {
-          state.candidateVotes.push(candidateVoteData);
-        }
-        
-        state.fetchingVotes = false;
-      })
-      .addCase(getCandidateVotes.rejected, (state, action) => {
-        state.fetchingVotes = false;
-        state.error = action.error.message || "Failed to get candidate votes";
-      })
-      
-      // Get all candidate votes for a campaign
-      .addCase(getAllCandidateVotes.pending, (state) => {
-        state.fetchingVotes = true;
-      })
-      .addCase(getAllCandidateVotes.fulfilled, (state, action) => {
-        const existingIndex = state.campaignVotes.findIndex(
-          vote => vote.campaignId === action.payload.campaignId
-        );
-        
-        if (existingIndex !== -1) {
-          state.campaignVotes[existingIndex] = action.payload;
-        } else {
-          state.campaignVotes.push(action.payload);
-        }
-        
-        state.fetchingVotes = false;
-      })
-      .addCase(getAllCandidateVotes.rejected, (state, action) => {
-        state.fetchingVotes = false;
-        state.error = action.error.message || "Failed to get campaign votes";
-      })
-      
-      // Get user vote
-      .addCase(getUserVote.pending, (state) => {
-        state.fetchingVotes = true;
-      })
-      .addCase(getUserVote.fulfilled, (state, action) => {
-        const userVoteData: UserVoteData = {
-          campaignId: action.payload.campaignId,
-          userAddress: action.payload.userAddress,
-          votedFor: action.payload.votedCandidate
-        };
-        
-        const existingIndex = state.userVotes.findIndex(
-          vote => vote.campaignId === userVoteData.campaignId && 
-                  vote.userAddress === userVoteData.userAddress
-        );
-        
-        if (existingIndex !== -1) {
-          state.userVotes[existingIndex] = userVoteData;
-        } else {
-          state.userVotes.push(userVoteData);
-        }
-        
-        state.fetchingVotes = false;
-      })
-      .addCase(getUserVote.rejected, (state, action) => {
-        state.fetchingVotes = false;
-        state.error = action.error.message || "Failed to get user vote";
-      })
-      
-      // Cast vote
-      .addCase(castVote.pending, (state) => {
-        state.votingLoading = true;
-        state.votingError = null;
-      })
-      .addCase(castVote.fulfilled, (state, action) => {
-        state.votingLoading = false;
-        state.votingError = null;
-        
-        const { campaignId, candidate } = action.payload;
-        
-        // Update vote count for the candidate in the campaign votes
-        const campaignVoteIndex = state.campaignVotes.findIndex(
-          vote => vote.campaignId === campaignId
-        );
-        
-        if (campaignVoteIndex !== -1) {
-          const currentVotes = state.campaignVotes[campaignVoteIndex].candidateVotes[candidate] || 0;
-          state.campaignVotes[campaignVoteIndex].candidateVotes[candidate] = currentVotes + 1;
-        }
-        
-        // Update individual candidate vote record
-        const candidateVoteIndex = state.candidateVotes.findIndex(
-          vote => vote.campaignId === campaignId && 
-                  vote.candidateAddress === candidate
-        );
-        
-        if (candidateVoteIndex !== -1) {
-          state.candidateVotes[candidateVoteIndex].votes += 1;
-        }
-        
-        // Update user vote record
-        const userVoteData: UserVoteData = {
-          campaignId,
-          userAddress: candidate, // Since we don't have voter address, use candidate for now
-          votedFor: candidate
-        };
-        
-        const userVoteIndex = state.userVotes.findIndex(
-          vote => vote.campaignId === userVoteData.campaignId && 
-                  vote.userAddress === userVoteData.userAddress
-        );
-        
-        if (userVoteIndex !== -1) {
-          state.userVotes[userVoteIndex] = userVoteData;
-        } else {
-          state.userVotes.push(userVoteData);
-        }
-      })
-      .addCase(castVote.rejected, (state, action) => {
-        state.votingLoading = false;
-        state.votingError = action.payload as string || "Failed to cast vote";
-      })
-      
-      // Manual close campaign
-      .addCase(manualCloseCampaign.pending, (state) => {
-        state.closingCampaign = true;
-        state.error = null;
-      })
-      .addCase(manualCloseCampaign.fulfilled, (state, action) => {
-        const campaignId = Number(action.payload.campaignId);
-        
-        // Update campaign status to closed
-        const campaignIndex = state.campaigns.findIndex(c => c.id === campaignId);
-        if (campaignIndex !== -1) {
-          state.campaigns[campaignIndex].isOpen = false;
-        }
-        
-        // Update nearby campaigns
-        const nearbyCampaignIndex = state.nearbyCampaigns.findIndex(c => c.id === campaignId);
-        if (nearbyCampaignIndex !== -1) {
-          state.nearbyCampaigns[nearbyCampaignIndex].isOpen = false;
-        }
-        
-        // Update active campaign if it matches
-        if (state.activeCampaign?.id === campaignId) {
-          state.activeCampaign.isOpen = false;
-          state.activeCampaign = null;
-          state.hasActive = false;
-        }
-        
-        state.closingCampaign = false;
-        state.error = null;
-      })
-      .addCase(manualCloseCampaign.rejected, (state, action) => {
-        state.closingCampaign = false;
-        state.error = action.payload as string || "Failed to close campaign";
-      })
-      
-      // Check upkeep
-      .addCase(checkUpkeep.pending, (state) => {
-        state.upkeepLoading = true;
-      })
-      .addCase(checkUpkeep.fulfilled, (state, action) => {
-        state.upkeepData = {
-          campaignId: Number(action.payload.performData),
-          upkeepNeeded: action.payload.upkeepNeeded,
-          performData: action.payload.performData
-        };
-        state.upkeepLoading = false;
-      })
-      .addCase(checkUpkeep.rejected, (state, action) => {
-        state.upkeepData = null;        state.upkeepLoading = false;
-        state.error = action.error.message || "Failed to check upkeep";
-      })
-      
-      // Perform upkeep
-      .addCase(performUpkeep.pending, (state) => {
-        state.upkeepLoading = true;
-      })
-      .addCase(performUpkeep.fulfilled, (state, action) => {
-        const campaignId = Number(action.payload.performData);
-        
-        // Campaign has been closed via upkeep
-        const campaignIndex = state.campaigns.findIndex(c => c.id === campaignId);
-        if (campaignIndex !== -1) {
-          state.campaigns[campaignIndex].isOpen = false;
-        }
-        
-        // Update nearby campaigns
-        const nearbyCampaignIndex = state.nearbyCampaigns.findIndex(c => c.id === campaignId);
-        if (nearbyCampaignIndex !== -1) {
-          state.nearbyCampaigns[nearbyCampaignIndex].isOpen = false;
-        }
-        
-        if (state.activeCampaign?.id === campaignId) {
-          state.activeCampaign.isOpen = false;
-          state.activeCampaign = null;
-          state.hasActive = false;
-        }
-        
-        // Clear upkeep data
-        state.upkeepData = null;
-        state.upkeepLoading = false;
-      })
-      .addCase(performUpkeep.rejected, (state, action) => {
-        state.upkeepLoading = false;
-        state.error = action.payload as string || "Failed to perform upkeep";
-      })
-      
-      // Admin Dashboard Data
+      // Fetch admin dashboard data
       .addCase(fetchAdminDashboardData.pending, (state) => {
         state.adminLoading = true;
         state.adminError = null;
       })
       .addCase(fetchAdminDashboardData.fulfilled, (state, action) => {
-        state.adminDashboard = {
-          ...action.payload,
-          verificationRequests: action.payload.verificationRequests.map(request => ({
-            ...request,
-            requestedRole: Number(request.requestedRole),
-            status: Number(request.status)
-          }))
-        };
+        state.adminDashboard = action.payload;
+        state.selectedCampaignId = action.payload.selectedCampaignId;
+        state.campaignList = action.payload.campaignList.map(campaign => ({
+          ...campaign,
+          status: getStatusAsNumber(campaign.status) // Convert string status to number
+        }));
+        state.verificationRequests = action.payload.verificationRequests;
         state.adminLoading = false;
         state.adminError = null;
       })
@@ -710,7 +225,37 @@ const adminSlice = createSlice({
         state.adminError = action.payload as string || "Failed to fetch admin dashboard data";
       })
       
-      // Admin Create Campaign
+      // Select campaign
+      .addCase(selectCampaign.pending, (state) => {
+        state.adminLoading = true;
+        state.adminError = null;
+      })
+      .addCase(selectCampaign.fulfilled, (state, action) => {
+        state.selectedCampaignId = action.payload;
+        state.adminLoading = false;
+        state.adminError = null;
+      })
+      .addCase(selectCampaign.rejected, (state, action) => {
+        state.adminLoading = false;
+        state.adminError = action.error.message || "Failed to select campaign";
+      })
+      
+      // Fetch all campaign IDs
+      .addCase(fetchAllCampaignIds.pending, (state) => {
+        state.loading = true;
+        state.error = null;
+      })
+      .addCase(fetchAllCampaignIds.fulfilled, (state, action) => {
+        state.campaignList = action.payload;
+        state.loading = false;
+        state.error = null;
+      })
+      .addCase(fetchAllCampaignIds.rejected, (state, action) => {
+        state.loading = false;
+        state.error = action.payload as string || "Failed to fetch campaign IDs";
+      })
+      
+      // Admin create campaign
       .addCase(adminCreateCampaign.pending, (state) => {
         state.creatingCampaign = true;
         state.adminError = null;
@@ -718,14 +263,17 @@ const adminSlice = createSlice({
       .addCase(adminCreateCampaign.fulfilled, (state) => {
         state.creatingCampaign = false;
         state.adminError = null;
-        // Campaign ID is returned, refresh dashboard data will be needed
+        // Add the new campaign to the list if we have the dashboard data
+        if (state.adminDashboard) {
+          state.adminDashboard.totalCampaigns += 1;
+        }
       })
       .addCase(adminCreateCampaign.rejected, (state, action) => {
         state.creatingCampaign = false;
         state.adminError = action.payload as string || "Failed to create campaign";
       })
       
-      // Admin Delete Campaign
+      // Admin delete campaign
       .addCase(adminDeleteCampaign.pending, (state) => {
         state.deletingCampaign = true;
         state.adminError = null;
@@ -733,26 +281,17 @@ const adminSlice = createSlice({
       .addCase(adminDeleteCampaign.fulfilled, (state, action) => {
         state.deletingCampaign = false;
         state.adminError = null;
+        const deletedCampaignId = action.payload;
         
-        // Remove from campaigns array
-        state.campaigns = state.campaigns.filter((c) => c.id !== action.payload);
-        state.nearbyCampaigns = state.nearbyCampaigns.filter((c) => c.id !== action.payload);
+        // Remove from campaign list
+        state.campaignList = state.campaignList.filter(c => c.id !== deletedCampaignId);
         
-        // Clean up related data
-        state.userRegistrations = state.userRegistrations.filter(reg => reg.campaignId !== action.payload);
-        state.candidateVotes = state.candidateVotes.filter(vote => vote.campaignId !== action.payload);
-        state.campaignVotes = state.campaignVotes.filter(vote => vote.campaignId !== action.payload);
-        state.userVotes = state.userVotes.filter(vote => vote.campaignId !== action.payload);
-        
-        if (state.activeCampaign?.id === action.payload) {
-          state.activeCampaign = null;
-          state.hasActive = false;
-        }
-        
-        // Update admin dashboard if current campaign was deleted
-        if (state.adminDashboard?.currentCampaign?.id === action.payload) {
+        // Update admin dashboard if the deleted campaign was selected
+        if (state.selectedCampaignId === deletedCampaignId) {
+          state.selectedCampaignId = 0;
           if (state.adminDashboard) {
             state.adminDashboard.currentCampaign = null;
+            state.adminDashboard.selectedCampaignId = 0;
           }
         }
       })
@@ -761,7 +300,7 @@ const adminSlice = createSlice({
         state.adminError = action.payload as string || "Failed to delete campaign";
       })
       
-      // Admin Manual Close Campaign
+      // Admin manual close campaign
       .addCase(adminManualCloseCampaign.pending, (state) => {
         state.closingCampaign = true;
         state.adminError = null;
@@ -769,36 +308,12 @@ const adminSlice = createSlice({
       .addCase(adminManualCloseCampaign.fulfilled, (state, action) => {
         state.closingCampaign = false;
         state.adminError = null;
+        const closedCampaignId = action.payload;
         
-        // Update campaign status to closed
-        const campaignIndex = state.campaigns.findIndex(c => c.id === action.payload);
-        if (campaignIndex !== -1) {
-          state.campaigns[campaignIndex].isOpen = false;
-        }
-        
-        // Update nearby campaigns
-        const nearbyCampaignIndex = state.nearbyCampaigns.findIndex(c => c.id === action.payload);
-        if (nearbyCampaignIndex !== -1) {
-          state.nearbyCampaigns[nearbyCampaignIndex].isOpen = false;
-        }
-        
-        // Update active campaign if it matches
-        if (state.activeCampaign?.id === action.payload) {
-          const activeCampaign = state.activeCampaign;
-          if (activeCampaign) {
-            activeCampaign.isOpen = false;
-          }
-          state.activeCampaign = null;
-          state.hasActive = false;
-        }
-        
-        // Update admin dashboard current campaign if it matches
-        if (state.adminDashboard?.currentCampaign?.id === action.payload) {
-          const currentCampaign = state.adminDashboard?.currentCampaign;
-          if (currentCampaign) {
-            currentCampaign.isOpen = false;
-            currentCampaign.status = 'Completed';
-          }
+        // Update campaign status in admin dashboard
+        if (state.adminDashboard?.currentCampaign?.id === closedCampaignId) {
+          state.adminDashboard.currentCampaign.isOpen = false;
+          state.adminDashboard.currentCampaign.status = 'Completed';
         }
       })
       .addCase(adminManualCloseCampaign.rejected, (state, action) => {
@@ -806,7 +321,7 @@ const adminSlice = createSlice({
         state.adminError = action.payload as string || "Failed to close campaign";
       })
       
-      // Admin Process Verification
+      // Admin process verification
       .addCase(adminProcessVerification.pending, (state) => {
         state.processingVerification = true;
         state.verificationError = null;
@@ -814,17 +329,22 @@ const adminSlice = createSlice({
       .addCase(adminProcessVerification.fulfilled, (state, action) => {
         state.processingVerification = false;
         state.verificationError = null;
+        const { userAddress } = action.payload;
         
-        // Remove processed request from verification requests
+        // Remove the processed request from the list
         state.verificationRequests = state.verificationRequests.filter(
-          req => req.userAddress !== action.payload.userAddress
+          req => req.userAddress !== userAddress
         );
         
-        // Also remove from admin dashboard verification requests if exists
         if (state.adminDashboard) {
           state.adminDashboard.verificationRequests = state.adminDashboard.verificationRequests.filter(
-            req => req.userAddress !== action.payload.userAddress
+            req => req.userAddress !== userAddress
           );
+        }
+        
+        // Clear selected request if it was the processed one
+        if (state.selectedVerificationRequest?.userAddress === userAddress) {
+          state.selectedVerificationRequest = null;
         }
       })
       .addCase(adminProcessVerification.rejected, (state, action) => {
@@ -832,132 +352,86 @@ const adminSlice = createSlice({
         state.verificationError = action.payload as string || "Failed to process verification";
       })
       
-      // Get Verification Request Details
+      // Get verification request details
       .addCase(getVerificationRequestDetails.pending, (state) => {
-        state.verificationLoading = true;
+        state.fetchingVerificationDetails = true;
         state.verificationError = null;
       })
-      .addCase(getVerificationRequestDetails.fulfilled, (state) => {
-        state.verificationLoading = false;
+      .addCase(getVerificationRequestDetails.fulfilled, (state, action) => {
+        state.fetchingVerificationDetails = false;
         state.verificationError = null;
-        // Details are returned in payload, can be handled by component
+        state.selectedVerificationRequest = action.payload;
       })
       .addCase(getVerificationRequestDetails.rejected, (state, action) => {
-        state.verificationLoading = false;
+        state.fetchingVerificationDetails = false;
         state.verificationError = action.payload as string || "Failed to get verification request details";
+      })
+      
+      // Fetch verification requests
+      .addCase(fetchVerificationRequests.pending, (state) => {
+        state.fetchingVerificationRequests = true;
+        state.verificationError = null;
+      })
+      .addCase(fetchVerificationRequests.fulfilled, (state, action) => {
+        state.fetchingVerificationRequests = false;
+        state.verificationError = null;
+        state.verificationRequests = action.payload;
+      })
+      .addCase(fetchVerificationRequests.rejected, (state, action) => {
+        state.fetchingVerificationRequests = false;
+        state.verificationError = action.payload as string || "Failed to fetch verification requests";
       });
   },
 });
 
-export const { 
-  clearError, 
-  clearRegistrationError, 
-  clearVotingError,
+export const {
+  clearError,
   clearAdminError,
   clearVerificationError,
-  resetCampaignState,
+  resetAdminState,
   updateCampaignStatus,
-  updateUserVote
+  updateUserVote,
+  setSelectedCampaign,
+  removeVerificationRequest,
+  setSelectedVerificationRequest,
 } = adminSlice.actions;
 
 export default adminSlice.reducer;
 
-// Update selector types
-export const selectCampaigns = (state: { admin: CampaignState }) => state.admin.campaigns;
-export const selectNearbyCampaigns = (state: { admin: CampaignState }) => state.admin.nearbyCampaigns;
-export const selectActiveCampaign = (state: { admin: CampaignState }) => state.admin.activeCampaign;
-export const selectHasActiveCampaign = (state: { admin: CampaignState }) => state.admin.hasActive;
-export const selectCampaignLoading = (state: { admin: CampaignState }) => state.admin.loading;
-export const selectCampaignError = (state: { admin: CampaignState }) => state.admin.error;
+// Selectors
+export const selectAdminDashboard = (state: { admin: AdminState }) => state.admin.adminDashboard;
+export const selectAdminLoading = (state: { admin: AdminState }) => state.admin.adminLoading;
+export const selectAdminError = (state: { admin: AdminState }) => state.admin.adminError;
+export const selectVerificationRequests = (state: { admin: AdminState }) => state.admin.verificationRequests;
+export const selectVerificationError = (state: { admin: AdminState }) => state.admin.verificationError;
+export const selectProcessingVerification = (state: { admin: AdminState }) => state.admin.processingVerification;
+export const selectSelectedCampaignId = (state: { admin: AdminState }) => state.admin.selectedCampaignId;
+export const selectCampaignList = (state: { admin: AdminState }) => state.admin.campaignList;
+export const selectCreatingCampaign = (state: { admin: AdminState }) => state.admin.creatingCampaign;
+export const selectDeletingCampaign = (state: { admin: AdminState }) => state.admin.deletingCampaign;
+export const selectClosingCampaign = (state: { admin: AdminState }) => state.admin.closingCampaign;
+export const selectFetchingVerificationRequests = (state: { admin: AdminState }) => state.admin.fetchingVerificationRequests;
+export const selectFetchingVerificationDetails = (state: { admin: AdminState }) => state.admin.fetchingVerificationDetails;
+export const selectSelectedVerificationRequest = (state: { admin: AdminState }) => state.admin.selectedVerificationRequest;
 
-// Registration selectors
-export const selectRegistrationLoading = (state: { admin: CampaignState }) => state.admin.registrationLoading;
-export const selectRegistrationError = (state: { admin: CampaignState }) => state.admin.registrationError;
-export const selectUserRegistrations = (state: { admin: CampaignState }) => state.admin.userRegistrations;
-export const selectCheckingRegistration = (state: { admin: CampaignState }) => state.admin.checkingRegistration;
+export const selectCurrentCampaign = (state: { admin: AdminState }) => state.admin.adminDashboard?.currentCampaign;
+export const selectCandidates = (state: { admin: AdminState }) => state.admin.adminDashboard?.candidates || [];
+export const selectVoters = (state: { admin: AdminState }) => state.admin.adminDashboard?.voters || [];
+export const selectParticipantStats = (state: { admin: AdminState }) => state.admin.adminDashboard?.participantStats;
+export const selectVoteStats = (state: { admin: AdminState }) => state.admin.adminDashboard?.voteStats;
+export const selectMonthlyCampaigns = (state: { admin: AdminState }) => state.admin.adminDashboard?.monthlyCampaigns;
+export const selectTotalCampaigns = (state: { admin: AdminState }) => state.admin.adminDashboard?.totalCampaigns || 0;
+export const selectActiveCampaigns = (state: { admin: AdminState }) => state.admin.adminDashboard?.activeCampaigns || 0;
+export const selectCompletedCampaigns = (state: { admin: AdminState }) => state.admin.adminDashboard?.completedCampaigns || 0;
 
-// Voting selectors
-export const selectVotingLoading = (state: { admin: CampaignState }) => state.admin.votingLoading;
-export const selectVotingError = (state: { admin: CampaignState }) => state.admin.votingError;
-export const selectCandidateVotes = (state: { admin: CampaignState }) => state.admin.candidateVotes;
-export const selectCampaignVotes = (state: { admin: CampaignState }) => state.admin.campaignVotes;
-export const selectUserVotes = (state: { admin: CampaignState }) => state.admin.userVotes;
-export const selectFetchingVotes = (state: { admin: CampaignState }) => state.admin.fetchingVotes;
-
-// Upkeep selectors
-export const selectUpkeepData = (state: { admin: CampaignState }) => state.admin.upkeepData;
-export const selectUpkeepLoading = (state: { admin: CampaignState }) => state.admin.upkeepLoading;
-
-// Admin dashboard selectors
-export const selectAdminDashboard = (state: { admin: CampaignState }) => state.admin.adminDashboard;
-export const selectAdminLoading = (state: { admin: CampaignState }) => state.admin.adminLoading;
-export const selectAdminError = (state: { admin: CampaignState }) => state.admin.adminError;
-
-// Verification selectors
-export const selectVerificationRequests = (state: { admin: CampaignState }) => state.admin.verificationRequests;
-export const selectVerificationLoading = (state: { admin: CampaignState }) => state.admin.verificationLoading;
-export const selectVerificationError = (state: { admin: CampaignState }) => state.admin.verificationError;
-export const selectProcessingVerification = (state: { admin: CampaignState }) => state.admin.processingVerification;
-
-// UI state selectors
-export const selectFetchingNearby = (state: { admin: CampaignState }) => state.admin.fetchingNearby;
-export const selectClosingCampaign = (state: { admin: CampaignState }) => state.admin.closingCampaign;
-export const selectDeletingCampaign = (state: { admin: CampaignState }) => state.admin.deletingCampaign;
-export const selectCreatingCampaign = (state: { admin: CampaignState }) => state.admin.creatingCampaign;
-
-// Helper selectors for specific data lookups
-export const selectUserRegistrationForCampaign = (state: { admin: CampaignState }, campaignId: number, userAddress: string) => 
-  state.admin.userRegistrations.find(reg => 
-    reg.campaignId === campaignId && reg.userAddress.toLowerCase() === userAddress.toLowerCase()
-  );
-
-export const selectCandidateVotesForCampaign = (state: { admin: CampaignState }, campaignId: number) => 
-  state.admin.candidateVotes.filter(vote => vote.campaignId === campaignId);
-
-export const selectCampaignVotesById = (state: { admin: CampaignState }, campaignId: number) => 
-  state.admin.campaignVotes.find(vote => vote.campaignId === campaignId);
-
-export const selectUserVoteForCampaign = (state: { admin: CampaignState }, campaignId: number, userAddress: string) => 
-  state.admin.userVotes.find(vote => 
-    vote.campaignId === campaignId && vote.userAddress.toLowerCase() === userAddress.toLowerCase()
-  );
-
-export const selectCampaignById = (state: { admin: CampaignState }, campaignId: number) => 
-  state.admin.campaigns.find(campaign => campaign.id === campaignId);
-
-export const selectNearbyCampaignById = (state: { admin: CampaignState }, campaignId: number) => 
-  state.admin.nearbyCampaigns.find(campaign => campaign.id === campaignId);
-
-// Computed selectors
-export const selectTotalVotesForCampaign = (state: { admin: CampaignState }, campaignId: number) => {
-  const campaignVotes = state.admin.campaignVotes.find(vote => vote.campaignId === campaignId);
-  if (!campaignVotes) return 0;
-  
-  return Object.values(campaignVotes.candidateVotes).reduce((total, votes) => total + votes, 0);
-};
-
-export const selectHasUserVoted = (state: { admin: CampaignState }, campaignId: number, userAddress: string) => {
-  const userVote = state.admin.userVotes.find(vote => 
-    vote.campaignId === campaignId && vote.userAddress.toLowerCase() === userAddress.toLowerCase()
-  );
-  return userVote?.votedFor !== null && userVote?.votedFor !== undefined;
-};
-
-export const selectIsUserRegisteredForCampaign = (state: { admin: CampaignState }, campaignId: number, userAddress: string) => {
-  const registration = state.admin.userRegistrations.find(reg => 
-    reg.campaignId === campaignId && reg.userAddress.toLowerCase() === userAddress.toLowerCase()
-  );
-  return registration !== undefined;
-};
-
-export const selectIsUserCandidateForCampaign = (state: { admin: CampaignState }, campaignId: number, userAddress: string) => {
+export const selectIsUserCandidateForCampaign = (state: { admin: AdminState }, campaignId: number, userAddress: string) => {
   const registration = state.admin.userRegistrations.find(reg => 
     reg.campaignId === campaignId && reg.userAddress.toLowerCase() === userAddress.toLowerCase()
   );
   return registration?.isCandidate || false;
 };
 
-export const selectIsUserVoterForCampaign = (state: { admin: CampaignState }, campaignId: number, userAddress: string) => {
+export const selectIsUserVoterForCampaign = (state: { admin: AdminState }, campaignId: number, userAddress: string) => {
   const registration = state.admin.userRegistrations.find(reg => 
     reg.campaignId === campaignId && reg.userAddress.toLowerCase() === userAddress.toLowerCase()
   );

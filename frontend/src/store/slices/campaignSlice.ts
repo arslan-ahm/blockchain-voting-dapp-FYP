@@ -19,106 +19,18 @@ import {
   getCampaignVoters,
   getMonthlyCampaigns
 } from "../thunks/campaignThunks";
+import type {
+  CampaignDetails,
+  CandidateVote,
+  UserRegistration,
+  UserVote,
+  VoterDetail,
+  CampaignStats,
+  MonthlyCampaign,
+  CampaignState
+} from "../../types";
 
-export interface CampaignDetails {
-  campaignId: string;
-  startDate: string;
-  endDate: string;
-  winner: string;
-  isOpen: boolean;
-  isDeleted: boolean;
-  detailsIpfsHash: string;
-  title: string;
-  description: string;
-  totalVotes: string;
-  voterCount: string;
-  candidateCount: string;
-  status: number;
-}
 
-interface CandidateVote {
-  candidate: string;
-  name?: string;
-  votes: string;
-}
-
-interface UserRegistration {
-  campaignId: number;
-  userAddress: string;
-  isVoter: boolean;
-  isCandidate: boolean;
-}
-
-interface UserVote {
-  campaignId: number;
-  userAddress: string;
-  votedCandidate: string | null;
-}
-
-interface VoterDetail {
-  address: string;
-  name: string;
-  hasVoted: boolean;
-}
-
-interface CampaignStats {
-  campaignId: number;
-  totalVoters: string;
-  votedCount: string;
-  notVotedCount: string;
-  candidateCount: string;
-  voterCount: string;
-}
-
-interface MonthlyCampaign {
-  campaignId: string;
-  startDate: string;
-  endDate: string;
-  title: string;
-  status: number;
-  winner: string;
-}
-
-interface CampaignState {
-  status: "idle" | "pending" | "success" | "error";
-  error: string | null;
-  
-  campaigns: CampaignDetails[];
-  nearbyCampaigns: CampaignDetails[];
-  activeCampaign: CampaignDetails | null;
-  
-  voteStatus: "idle" | "pending" | "success" | "error";
-  registrationStatus: "idle" | "pending" | "success" | "error";
-  
-  candidateVotes: { [campaignId: number]: CandidateVote[] };
-  userRegistrations: UserRegistration[];
-  userVotes: UserVote[];
-  campaignVoters: { [campaignId: number]: VoterDetail[] };
-  campaignStats: { [campaignId: number]: CampaignStats };
-  monthlyCampaigns: { [month: number]: MonthlyCampaign[] };
-  
-  hasActiveCampaign: boolean;
-  activeCampaignId: string;
-  transactionHash: string | null;
-  
-  upkeepNeeded: boolean;
-  performData: string | null;
-  
-  fetchingCampaigns: boolean;
-  fetchingNearbyCampaigns: boolean;
-  fetchingActiveCampaign: boolean;
-  fetchingVotes: boolean;
-  fetchingRegistration: boolean;
-  fetchingStats: boolean;
-  fetchingVoters: boolean;
-  fetchingMonthlyCampaigns: boolean;
-  creatingCampaign: boolean;
-  deletingCampaign: boolean;
-  castingVote: boolean;
-  closingCampaign: boolean;
-  performingUpkeep: boolean;
-  checkingUpkeep: boolean;
-}
 
 const initialState: CampaignState = {
   status: "idle",

@@ -1,5 +1,5 @@
 // src/hooks/useStart.ts
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "./useRedux";
 import { fetchUserDetails } from "../store/thunks/userThunks";
 import { fetchCampaigns } from "../store/thunks/campaignThunks";
@@ -9,9 +9,11 @@ const useStart = () => {
     const dispatch = useAppDispatch();
     const user = useAppSelector((state) => state.user);
     const { provider } = useWallet();
+    const [isInitializing, setIsInitializing] = useState<boolean>(false);
 
     useEffect(() => {
         if (user.account && provider) {
+            setIsInitializing(true);
             console.log("Fetching user details for:", user.account);
             
             dispatch(fetchUserDetails({account:user.account, provider})).then((result) => {
@@ -19,12 +21,13 @@ const useStart = () => {
                 console.log("Fetched user:", payload);
             });
             dispatch(fetchCampaigns());
+            setIsInitializing(false);
         }
-    }, [user.account, user.role, dispatch, provider]); // Fixed: Added missing dependencies
+    }, [user.account, user.role, dispatch, provider]);
 
     return {
         user,
-        isInitializing: user.loading && !user.details, // Add loading state
+        isInitializing,
     };
 };
 

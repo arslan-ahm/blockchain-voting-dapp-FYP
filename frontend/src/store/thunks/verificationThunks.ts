@@ -7,7 +7,7 @@ import {
   VOTING_CONTRACT_ADDRESS,
 } from "../../constants/contract";
 
-interface VerificationRequest {
+interface VerificationRequestPayload {
   role: Role;
   docIpfsHash: string;
   signer: ethers.Signer;
@@ -15,7 +15,7 @@ interface VerificationRequest {
 
 export const requestVerification = createAsyncThunk(
   "user/requestVerification",
-  async ({ role, docIpfsHash, signer }: VerificationRequest) => {
+  async ({ role, docIpfsHash, signer }: VerificationRequestPayload) => {
     if (!signer) throw new Error("Wallet not connected");
 
     const contract = new ethers.Contract(
@@ -38,31 +38,40 @@ export const requestVerification = createAsyncThunk(
 
 export const fetchVerificationRequests = createAsyncThunk(
   "verification/fetchVerificationRequests",
-  async ({ provider }: { provider: ethers.Provider }) => {
+  async ({ signer }: { signer: ethers.Signer }) => {
+    if (!signer) throw new Error("Admin wallet not connected");
+
     const contract = new ethers.Contract(
       VOTING_CONTRACT_ADDRESS,
       VOTING_CONTRACT_ABI,
-      provider
+      signer
     );
 
     try {
+      // Get all the data returned by the smart contract function
       const [
         userAddresses,
         requestedRoles,
         verificationDocIpfsHashes,
         adminFeedbacks,
+        userNames,
+        timestamps
       ] = await contract.getPendingVerificationRequests();
 
+      // Map the returned data to the expected format
       const requests = userAddresses.map((address: string, index: number) => ({
         userAddress: address,
-        requestedRole: requestedRoles[index],
+        requestedRole: Number(requestedRoles[index]), // Convert BigInt to number
         status: RequestStatus.Pending,
         verificationDocIpfsHash: verificationDocIpfsHashes[index],
         adminFeedback: adminFeedbacks[index],
+        userName: userNames[index], // Include user name
+        requestTimestamp: Number(timestamps[index]) // Convert BigInt to number
       }));
 
       return requests;
     } catch (error) {
+      console.error("Error fetching verification requests:", error);
       toast.error("Failed to fetch verification requests");
       throw error;
     }
@@ -91,16 +100,17 @@ export const processVerification = createAsyncThunk(
     );
 
     try {
+      // Remove the extra 'signer' parameter - the contract method only takes 3 parameters
       const tx = await contract.processVerification(
         userAddress,
         approved,
-        feedback,
-        signer
+        feedback
       );
       await tx.wait();
       toast.success(`Verification ${approved ? "approved" : "rejected"}`);
       return { userAddress };
     } catch (error) {
+      console.error("Error processing verification:", error);
       toast.error("Failed to process verification");
       throw error;
     }

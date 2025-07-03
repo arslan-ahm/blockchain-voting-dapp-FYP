@@ -81,7 +81,7 @@ export const CampaignCharts = ({ campaign }: CampaignChartsProps) => {
       {/* Participant's Chart */}
       <Card className="bg-gray-800 border-gray-700">
         <CardHeader>
-          <CardTitle className="text-white">Participants</CardTitle>
+          <CardTitle className="text-white mt-4">Participants</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
@@ -104,9 +104,9 @@ export const CampaignCharts = ({ campaign }: CampaignChartsProps) => {
       </Card>
 
       {/* Vote Status Chart */}
-      <Card className="bg-gray-800 border-gray-700">
+      <Card className="bg-gray-800 border-gray-700 ">
         <CardHeader>
-          <CardTitle className="text-white">Voting Status</CardTitle>
+          <CardTitle className="text-white mt-4">Voting Status</CardTitle>
         </CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>

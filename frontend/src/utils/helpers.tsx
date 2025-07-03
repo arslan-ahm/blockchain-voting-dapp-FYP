@@ -1,25 +1,25 @@
-import { useState } from "react";
-import { Button } from "../components/ui/button";
-import { Copy } from "lucide-react";
+import type { CampaignStatus } from "../types";
 
-export const CopyButton = ({ text, label }: { text: string, label: string }) => {
-    const [copied, setCopied] = useState(false);
+export const mapCampaignStatus = (status: number | string): CampaignStatus => {
+    if (typeof status === 'string') {
+      return status as CampaignStatus;
+    }
     
-    const handleCopy = () => {
-      navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    };
-  
-    return (
-      <Button
-        size="sm"
-        variant="ghost"
-        onClick={handleCopy}
-        className="text-blue-400 hover:text-blue-300 p-1"
-      >
-        <Copy className="w-3 h-3" />
-        {copied ? "Copied!" : label}
-      </Button>
-    );
+    switch (status) {
+      case 0: return "Upcoming";
+      case 1: return "Active";
+      case 2: return "Completed";
+      case 3: return "Deleted";
+      default: return "Upcoming";
+    }
   };
+
+  export function getStatusAsNumber(status: string): number {
+    switch(status) {
+      case 'Upcoming': return 0;
+      case 'Active': return 1;
+      case 'Completed': return 2;
+      case 'Deleted': return 3;
+      default: return 0;
+    }
+  }

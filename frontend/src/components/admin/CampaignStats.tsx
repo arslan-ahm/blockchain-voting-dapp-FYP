@@ -24,7 +24,7 @@ export const CampaignStats = ({ campaign }: CampaignStatsProps) => {
   }
 
   return (
-    <Card className="bg-gray-800 border-gray-700">
+    <Card className="bg-gray-800 border-gray-700 pt-4">
       <CardHeader>
         <CardTitle className="text-white flex items-center gap-2">
           <TrendingUp className="w-5 h-5" />
@@ -34,7 +34,7 @@ export const CampaignStats = ({ campaign }: CampaignStatsProps) => {
       <CardContent>
         <div className="space-y-4">
           <div className="p-4 bg-gray-700 rounded-lg">
-            <h3 className="font-medium text-white mb-3">Campaign-{campaign.id}</h3>
+            <h3 className="font-medium text-white mb-3">Campaign: {campaign.id}</h3>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-400">Start Date:</span>

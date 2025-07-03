@@ -4,19 +4,22 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import type { Campaign } from '../../../types';
+import { Loader2 } from 'lucide-react';
 
 interface DeleteCampaignDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onConfirm: (adminAddress: string) => void;
   campaign: Campaign | null;
+  isLoading?: boolean;
 }
 
 export const DeleteCampaignDialog = ({ 
   isOpen, 
   onClose, 
   onConfirm, 
-  campaign 
+  campaign,
+  isLoading 
 }: DeleteCampaignDialogProps) => {
   const [adminAddress, setAdminAddress] = useState("");
   
@@ -55,9 +58,16 @@ export const DeleteCampaignDialog = ({
             <Button 
               onClick={() => onConfirm(adminAddress)}
               className="flex-1 bg-red-600 hover:bg-red-700"
-              disabled={!adminAddress.trim()}
+              disabled={!adminAddress.trim() || isLoading}
             >
-              Confirm Delete
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                'Confirm Delete'
+              )}
             </Button>
             <Button 
               variant="outline" 

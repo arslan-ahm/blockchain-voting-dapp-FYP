@@ -1,7 +1,12 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { ethers } from "ethers";
-import { VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI } from "../../constants/contract";
+import {
+  VOTING_CONTRACT_ADDRESS,
+  VOTING_CONTRACT_ABI,
+} from "../../constants/contract";
 import { toast } from "sonner";
+import { RequestStatus } from "../../types";
+import type { VerificationRequestData, AdminDashboardData } from "../../types";
 
 interface ContractError extends Error {
   reason?: string;
@@ -24,106 +29,8 @@ interface CampaignDetailsResponse {
   status: number;
 }
 
-interface CandidateData {
-  address: string;
-  name: string;
-  voteCount: number;
-  role: string;
-}
-
-interface VoterData {
-  address: string;
-  name: string;
-  hasVoted: boolean;
-  role: string;
-}
-
-interface VerificationRequestData {
-  userAddress: string;
-  requestedRole: number;
-  verificationDocIpfsHash: string;
-  adminFeedback: string;
-  userName: string;
-  timestamp: number;
-  status: number;
-}
-
-interface AdminDashboardData {
-  // Campaign Details
-  currentCampaign: {
-    id: number;
-    title: string;
-    description: string;
-    startDate: number;
-    endDate: number;
-    duration: number;
-    winner: string;
-    isOpen: boolean;
-    status: 'Upcoming' | 'Active' | 'Completed' | 'Deleted';
-    detailsIpfsHash: string;
-    creationTimestamp?: number;
-  } | null;
-
-  participantStats: {
-    candidateCount: number;
-    voterCount: number;
-  };
-
-  voteStats: {
-    votedCount: number;
-    notVotedCount: number;
-    totalVoters: number;
-  };
-
-  monthlyCampaigns: {
-    campaignIds: number[];
-    titles: string[];
-    startDates: number[];
-    endDates: number[];
-    statuses: string[];
-    winners: string[];
-  };
-
-  candidates: CandidateData[];
-
-  voters: VoterData[];
-
-  verificationRequests: VerificationRequestData[];
-
-  totalCampaigns: number;
-  activeCampaigns: number;
-  completedCampaigns: number;
-}
-
-enum RequestStatus { Pending, Approved, Rejected }
-enum CampaignStatus { Upcoming, Active, Completed, Deleted }
-
-const getCurrentSigner = async (): Promise<ethers.Signer | null> => {
-  try {
-    if (!window.ethereum) return null;
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const accounts = await provider.send('eth_accounts', []);
-    if (accounts.length === 0) return null;
-    return await provider.getSigner();
-  } catch (error) {
-    console.error('Failed to get current signer:', error);
-    return null;
-  }
-};
-
-const getProvider = (): ethers.Provider => {
-  if (window.ethereum) {
-    try {
-      return new ethers.BrowserProvider(window.ethereum);
-    } catch (error) {
-      console.warn('Failed to create BrowserProvider, falling back to JsonRpcProvider:', error);
-    }
-  }
-  return new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-};
-
 const handleContractError = (error: unknown): string => {
-  if (error && typeof error === 'object' && 'reason' in error) {
+  if (error && typeof error === "object" && "reason" in error) {
     return String((error as ContractError).reason);
   }
 
@@ -137,6 +44,10 @@ const handleContractError = (error: unknown): string => {
       return "Insufficient funds for gas fees";
     } else if (message.includes("could not decode result data")) {
       return "Contract not found or invalid contract address";
+    } else if (message.includes("Cannot switch from active campaign")) {
+      return "Please wait for the current campaign to complete before switching";
+    } else if (message.includes("Cannot switch to deleted campaign")) {
+      return "Selected campaign is no longer available";
     } else if (message.includes("BAD_DATA")) {
       return "Invalid contract response - please check contract deployment";
     }
@@ -147,14 +58,19 @@ const handleContractError = (error: unknown): string => {
 };
 
 // Enhanced contract validation function
-const validateContract = async (contract: ethers.Contract): Promise<boolean> => {
+const validateContract = async (
+  contract: ethers.Contract
+): Promise<boolean> => {
   try {
     // Try to get contract code to verify deployment
     const provider = contract.runner?.provider || contract.provider;
-    if (provider && 'getCode' in provider) {
+    if (provider && "getCode" in provider) {
       const code = await provider.getCode(await contract.getAddress());
-      if (code === '0x') {
-        console.error('Contract not deployed at address:', await contract.getAddress());
+      if (code === "0x") {
+        console.error(
+          "Contract not deployed at address:",
+          await contract.getAddress()
+        );
         return false;
       }
     }
@@ -163,17 +79,19 @@ const validateContract = async (contract: ethers.Contract): Promise<boolean> => 
     await contract.nextCampaignId.staticCall();
     return true;
   } catch (error) {
-    console.error('Contract validation failed:', error);
+    console.error("Contract validation failed:", error);
     return false;
   }
 };
 
-const getMostRelevantCampaign = async (contract: ethers.Contract): Promise<number> => {
+const getMostRelevantCampaign = async (
+  contract: ethers.Contract
+): Promise<number> => {
   try {
     // Validate contract first
     const isValidContract = await validateContract(contract);
     if (!isValidContract) {
-      console.error('Contract validation failed');
+      console.error("Contract validation failed");
       return 0;
     }
 
@@ -192,7 +110,9 @@ const getMostRelevantCampaign = async (contract: ethers.Contract): Promise<numbe
 
     for (let i = 1; i <= totalCampaigns; i++) {
       try {
-        const result = await contract.getCampaignDetails.staticCall(i) as CampaignDetailsResponse;
+        const result = (await contract.getCampaignDetails.staticCall(
+          i
+        )) as CampaignDetailsResponse;
 
         if (result.isDeleted) continue;
 
@@ -223,53 +143,89 @@ const getMostRelevantCampaign = async (contract: ethers.Contract): Promise<numbe
 
 export const fetchAdminDashboardData = createAsyncThunk(
   "admin/fetchDashboardData",
-  async (_, { rejectWithValue }) => {
+  async (
+    {
+      campaignId,
+      signer,
+      provider,
+      forceRefresh = false,
+    }: {
+      campaignId?: number;
+      signer: ethers.Signer;
+      provider: ethers.Provider;
+      forceRefresh?: boolean;
+    },
+    { rejectWithValue }
+  ) => {
     try {
-      const provider = getProvider();
-      const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        provider
+      );
 
       // Validate contract deployment and ABI
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
-        return rejectWithValue("Contract not found or invalid. Please check the contract address and deployment.");
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
       }
 
-      const relevantCampaignId = await getMostRelevantCampaign(contract);
-
-      if (!relevantCampaignId) {
-        return {
-          currentCampaign: null,
-          participantStats: { candidateCount: 0, voterCount: 0 },
-          voteStats: { votedCount: 0, notVotedCount: 0, totalVoters: 0 },
-          monthlyCampaigns: { campaignIds: [], titles: [], startDates: [], endDates: [], statuses: [], winners: [] },
-          candidates: [],
-          voters: [],
-          verificationRequests: [],
-          totalCampaigns: 0,
-          activeCampaigns: 0,
-          completedCampaigns: 0
-        } as AdminDashboardData;
+      // Use provided campaignId or get the most relevant one if not provided
+      let targetCampaignId = campaignId;
+      if (!targetCampaignId || forceRefresh) {
+        targetCampaignId = await getMostRelevantCampaign(contract);
       }
 
-      const campaignDetails = await contract.getCampaignDetails.staticCall(relevantCampaignId) as CampaignDetailsResponse;
+      // If no campaign ID is available, return empty state
+      if (!targetCampaignId) {
+        return getEmptyDashboardData();
+      }
+
+      const campaignList = await getCampaignList(contract);
+
+      // Verify campaign exists and is not deleted
+      try {
+        const campaignInfo = await contract.getCampaignDetails.staticCall(
+          targetCampaignId
+        );
+        if (campaignInfo.isDeleted) {
+          throw new Error("Campaign has been deleted");
+        }
+      } catch (error) {
+        console.error(
+          `Campaign ${targetCampaignId} not found or deleted, falling back to most recent`,
+          error
+        );
+        targetCampaignId = await getMostRelevantCampaign(contract);
+        if (!targetCampaignId) {
+          return getEmptyDashboardData();
+        }
+      }
+
+      // Get campaign details
+      const campaignDetails = (await contract.getCampaignDetails.staticCall(
+        targetCampaignId
+      )) as CampaignDetailsResponse;
 
       const now = Math.floor(Date.now() / 1000);
       const startTime = Number(campaignDetails.startDate);
       const endTime = Number(campaignDetails.endDate);
 
-      let status: 'Upcoming' | 'Active' | 'Completed' | 'Deleted';
+      let status: "Upcoming" | "Active" | "Completed" | "Deleted";
       if (campaignDetails.isDeleted) {
-        status = 'Deleted';
+        status = "Deleted";
       } else if (now < startTime) {
-        status = 'Upcoming';
+        status = "Upcoming";
       } else if (now >= startTime && now < endTime && campaignDetails.isOpen) {
-        status = 'Active';
+        status = "Active";
       } else {
-        status = 'Completed';
+        status = "Completed";
       }
 
       const currentCampaign = {
-        id: relevantCampaignId,
+        id: targetCampaignId,
         title: campaignDetails.title,
         description: campaignDetails.description,
         startDate: startTime,
@@ -278,39 +234,57 @@ export const fetchAdminDashboardData = createAsyncThunk(
         winner: campaignDetails.winner,
         isOpen: campaignDetails.isOpen,
         status,
-        detailsIpfsHash: campaignDetails.detailsIpfsHash
+        detailsIpfsHash: campaignDetails.detailsIpfsHash,
       };
 
-      const participantStats = await contract.getParticipantStats.staticCall(relevantCampaignId);
+      // Get participant stats
+      const participantStats = {
+        candidateCount: Number(campaignDetails.candidateCount),
+        voterCount: Number(campaignDetails.voterCount),
+      };
 
-      const voteStats = await contract.getVotingStats.staticCall(relevantCampaignId);
+      // Get voting stats
+      const voteStats = await contract.getVotingStats(targetCampaignId);
 
-      const candidatesResult = await contract.getCampaignCandidates.staticCall(relevantCampaignId);
-      const candidates: CandidateData[] = [];
+      // Get candidates
+      const candidatesResult = await contract.getCampaignCandidates(
+        targetCampaignId
+      );
+      const candidatesPromises = candidatesResult.candidates.map(
+        async (address: string, i: number) => {
+          const voteCount = await contract.getCandidateVotes(
+            targetCampaignId,
+            address
+          );
+          return {
+            address,
+            name: candidatesResult.names[i] || "Unknown",
+            voteCount: Number(voteCount),
+            role: "Candidate" as const,
+          };
+        }
+      );
+      const candidates = await Promise.all(candidatesPromises);
 
-      for (let i = 0; i < candidatesResult.candidates.length; i++) {
-        candidates.push({
-          address: candidatesResult.candidates[i],
-          name: candidatesResult.names[i] || "Unknown",
-          voteCount: Number(candidatesResult.voteCounts[i]),
-          role: "Candidate"
-        });
-      }
+      // Get voters
+      const votersResult = await contract.getCampaignVoters(targetCampaignId);
+      const votersPromises = votersResult.voters.map(
+        async (address: string, i: number) => {
+          const hasVoted = votersResult.hasVotedList[i];
+          return {
+            address,
+            name: votersResult.names[i] || "Unknown",
+            hasVoted,
+            role: "Voter" as const,
+          };
+        }
+      );
+      const voters = await Promise.all(votersPromises);
 
-      const votersResult = await contract.getCampaignVoters.staticCall(relevantCampaignId);
-      const voters: VoterData[] = [];
-
-      for (let i = 0; i < votersResult.voters.length; i++) {
-        voters.push({
-          address: votersResult.voters[i],
-          name: votersResult.names[i] || "Unknown",
-          hasVoted: votersResult.hasVotedList[i],
-          role: "Voter"
-        });
-      }
-
-      const currentMonth = Math.floor(now / (30 * 24 * 60 * 60)) * (30 * 24 * 60 * 60);
-      const monthlyData = await contract.getMonthlyCampaigns.staticCall(currentMonth);
+      // Get monthly campaigns data
+      const currentMonth =
+        Math.floor(now / (30 * 24 * 60 * 60)) * (30 * 24 * 60 * 60);
+      const monthlyData = await contract.getMonthlyCampaigns(currentMonth);
 
       const monthlyCampaigns = {
         campaignIds: monthlyData.campaignIds.map((id: bigint) => Number(id)),
@@ -319,47 +293,81 @@ export const fetchAdminDashboardData = createAsyncThunk(
         endDates: monthlyData.endDates.map((date: bigint) => Number(date)),
         statuses: monthlyData.statuses.map((status: number) => {
           switch (status) {
-            case CampaignStatus.Upcoming: return "Upcoming";
-            case CampaignStatus.Active: return "Active";
-            case CampaignStatus.Completed: return "Completed";
-            case CampaignStatus.Deleted: return "Deleted";
-            default: return "Unknown";
+            case 0:
+              return "Upcoming";
+            case 1:
+              return "Active";
+            case 2:
+              return "Completed";
+            case 3:
+              return "Deleted";
+            default:
+              return "Unknown";
           }
         }),
-        winners: monthlyData.winners
+        winners: monthlyData.winners,
       };
 
+      // Get verification requests if admin
       const verificationRequests: VerificationRequestData[] = [];
-      try {
-        const signer = await getCurrentSigner();
-        if (signer) {
-          const adminContract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
-          const requestsData = await adminContract.getPendingVerificationRequests.staticCall();
+      if (signer) {
+        try {
+          const signerAddress = await signer.getAddress();
+          const contractAdmin = await contract.admin();
 
-          for (let i = 0; i < requestsData.userAddresses.length; i++) {
-            verificationRequests.push({
-              userAddress: requestsData.userAddresses[i],
-              requestedRole: Number(requestsData.requestedRoles[i]),
-              verificationDocIpfsHash: requestsData.verificationDocIpfsHashes[i],
-              adminFeedback: requestsData.adminFeedbacks[i],
-              userName: requestsData.userNames[i],
-              timestamp: Number(requestsData.timestamps[i]),
-              status: RequestStatus.Pending
-            });
+          if (signerAddress.toLowerCase() === contractAdmin.toLowerCase()) {
+            // Use direct call without TypeScript checking
+            const requestsData =
+              await contract.getPendingVerificationRequests.staticCall();
+
+            if (requestsData && requestsData.length >= 6) {
+              const [
+                userAddresses,
+                requestedRoles,
+                verificationDocIpfsHashes,
+                adminFeedbacks,
+                userNames,
+                timestamps,
+              ] = requestsData;
+
+              for (let i = 0; i < userAddresses.length; i++) {
+                verificationRequests.push({
+                  userAddress: userAddresses[i],
+                  requestedRole: Number(requestedRoles[i]),
+                  verificationDocIpfsHash: verificationDocIpfsHashes[i],
+                  adminFeedback: adminFeedbacks[i],
+                  userName: userNames[i],
+                  timestamp: Number(timestamps[i]),
+                  requestTimestamp: Number(timestamps[i]),
+                  status: RequestStatus.Pending,
+                  userInfo: {
+                    name: userNames[i] || "",
+                    email: "",
+                    dateOfBirth: 0,
+                    identityNumber: "",
+                    contactNumber: "",
+                    bio: "",
+                    profileImageIpfsHash: "",
+                    supportiveLinks: [],
+                  },
+                });
+              }
+            }
           }
+        } catch (error) {
+          console.error("Error fetching verification requests:", error);
         }
-      } catch (error) {
-        console.log("Could not fetch verification requests (may not be admin):", error);
       }
 
-      const nextCampaignId = await contract.nextCampaignId.staticCall();
-      const totalCampaigns = Number(nextCampaignId) - 1;
+      // Get campaign statistics
+      const nextId = await contract.nextCampaignId();
+      const totalCampaigns = Number(nextId) - 1;
       let activeCampaigns = 0;
       let completedCampaigns = 0;
 
       for (let i = 1; i <= totalCampaigns; i++) {
         try {
-          const details = await contract.getCampaignDetails.staticCall(i) as CampaignDetailsResponse;
+          const details = await contract.getCampaignDetails.staticCall(i);
           if (details.isDeleted) continue;
 
           const start = Number(details.startDate);
@@ -371,31 +379,29 @@ export const fetchAdminDashboardData = createAsyncThunk(
             completedCampaigns++;
           }
         } catch (error) {
-          console.log("Error fetching campaign statistics:", error);
+          console.error(`Error fetching campaign ${i}:`, error);
           continue;
         }
       }
 
       return {
         currentCampaign,
-        participantStats: {
-          candidateCount: Number(participantStats.candidateCount),
-          voterCount: Number(participantStats.voterCount)
-        },
+        participantStats,
         voteStats: {
           votedCount: Number(voteStats.votedCount),
           notVotedCount: Number(voteStats.notVotedCount),
-          totalVoters: Number(voteStats.totalVoters)
+          totalVoters: Number(voteStats.totalVoters),
         },
         monthlyCampaigns,
         candidates,
         voters,
         verificationRequests,
         totalCampaigns,
+        campaignList,
         activeCampaigns,
-        completedCampaigns
+        selectedCampaignId: targetCampaignId,
+        completedCampaigns,
       } as AdminDashboardData;
-
     } catch (error) {
       console.error("Failed to fetch admin dashboard data:", error);
       const errorMessage = handleContractError(error);
@@ -404,42 +410,166 @@ export const fetchAdminDashboardData = createAsyncThunk(
   }
 );
 
+export const selectCampaign = createAsyncThunk(
+  "admin/selectCampaign",
+  async (
+    {
+      campaignId,
+      signer,
+      provider,
+    }: { campaignId: number; signer: ethers.Signer; provider: ethers.Provider },
+    { dispatch }
+  ) => {
+    if (!provider) {
+      throw new Error("No provider available from signer");
+    }
+
+    // Fetch dashboard data for the selected campaign
+    await dispatch(fetchAdminDashboardData({ campaignId, signer, provider }));
+    return campaignId;
+  }
+);
+
+// Helper function to get empty dashboard data
+function getEmptyDashboardData(): AdminDashboardData {
+  return {
+    currentCampaign: null,
+    campaignList: [],
+    selectedCampaignId: 0,
+    participantStats: { candidateCount: 0, voterCount: 0 },
+    voteStats: { votedCount: 0, notVotedCount: 0, totalVoters: 0 },
+    monthlyCampaigns: {
+      campaignIds: [],
+      titles: [],
+      startDates: [],
+      endDates: [],
+      statuses: [],
+      winners: [],
+    },
+    candidates: [],
+    voters: [],
+    verificationRequests: [],
+    totalCampaigns: 0,
+    activeCampaigns: 0,
+    completedCampaigns: 0,
+  };
+}
+
+// Add this helper function
+export async function validateCampaignSwitch(
+  contract: ethers.Contract,
+  fromCampaignId: number,
+  toCampaignId: number
+): Promise<boolean> {
+  const [fromCampaign, toCampaign] = await Promise.all([
+    contract.getCampaignDetails.staticCall(fromCampaignId),
+    contract.getCampaignDetails.staticCall(toCampaignId),
+  ]);
+
+  // Don't allow switching from active campaign if it's not completed
+  if (
+    fromCampaign.status === 1 && // Active
+    !fromCampaign.isDeleted &&
+    Number(fromCampaign.endDate) > Math.floor(Date.now() / 1000)
+  ) {
+    throw new Error("Cannot switch from active campaign before completion");
+  }
+
+  // Validate target campaign
+  if (toCampaign.isDeleted) {
+    throw new Error("Cannot switch to deleted campaign");
+  }
+
+  return true;
+}
+
+export const fetchAllCampaignIds = createAsyncThunk(
+  "admin/fetchAllCampaignIds",
+  async ({ provider }: { provider: ethers.Provider }, { rejectWithValue }) => {
+    try {
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        provider
+      );
+
+      const isValidContract = await validateContract(contract);
+      if (!isValidContract) {
+        return rejectWithValue("Contract not found or invalid");
+      }
+
+      const nextId = await contract.nextCampaignId.staticCall();
+      const totalCampaigns = Number(nextId) - 1;
+      const campaigns = [];
+
+      for (let i = 1; i <= totalCampaigns; i++) {
+        const details = await contract.getCampaignDetails.staticCall(i);
+        if (!details.isDeleted) {
+          campaigns.push({
+            id: i,
+            title: details.title,
+            description: details.description,
+            status: details.status,
+          });
+        }
+      }
+
+      return campaigns;
+    } catch (error) {
+      console.error("Failed to fetch campaign IDs:", error);
+      return rejectWithValue(handleContractError(error));
+    }
+  }
+);
+
 export const adminCreateCampaign = createAsyncThunk(
   "admin/createCampaign",
-  async ({
-    startDate,
-    endDate,
-    detailsIpfsHash,
-    title,
-    description
-  }: {
-    startDate: number;
-    endDate: number;
-    detailsIpfsHash: string;
-    title: string;
-    description: string;
-  }, { rejectWithValue }) => {
-
-    const signer = await getCurrentSigner();
-
+  async (
+    {
+      startDate,
+      endDate,
+      detailsIpfsHash,
+      title,
+      description,
+      signer,
+    }: {
+      startDate: number;
+      endDate: number;
+      detailsIpfsHash: string;
+      title: string;
+      description: string;
+      signer: ethers.Signer;
+    },
+    { rejectWithValue }
+  ) => {
     if (!signer) {
-      return rejectWithValue("Wallet not connected - please connect your wallet first");
+      return rejectWithValue(
+        "Wallet not connected - please connect your wallet first"
+      );
     }
 
     try {
-      const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        signer
+      );
 
       // Validate contract
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
-        return rejectWithValue("Contract not found or invalid. Please check the contract address and deployment.");
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
       }
 
       const signerAddress = await signer.getAddress();
       const contractAdmin = await contract.admin.staticCall();
 
       if (signerAddress.toLowerCase() !== contractAdmin.toLowerCase()) {
-        return rejectWithValue("Access denied: Only admin can create campaigns");
+        return rejectWithValue(
+          "Access denied: Only admin can create campaigns"
+        );
       }
 
       if (endDate <= startDate) {
@@ -456,10 +586,23 @@ export const adminCreateCampaign = createAsyncThunk(
         return rejectWithValue("Campaign must run for at least 1 hour");
       }
 
-      const gasEstimate = await contract.createCampaign.estimateGas(startDate, endDate, detailsIpfsHash, title, description);
-      const tx = await contract.createCampaign(startDate, endDate, detailsIpfsHash, title, description, {
-        gasLimit: gasEstimate * 120n / 100n
-      });
+      const gasEstimate = await contract.createCampaign.estimateGas(
+        startDate,
+        endDate,
+        detailsIpfsHash,
+        title,
+        description
+      );
+      const tx = await contract.createCampaign(
+        startDate,
+        endDate,
+        detailsIpfsHash,
+        title,
+        description,
+        {
+          gasLimit: (gasEstimate * 120n) / 100n,
+        }
+      );
 
       const receipt = await tx.wait();
 
@@ -468,7 +611,7 @@ export const adminCreateCampaign = createAsyncThunk(
         const campaignCreatedEvent = receipt.logs.find((log: ethers.Log) => {
           try {
             const parsed = contract.interface.parseLog(log);
-            return parsed !== null && parsed.name === 'CampaignCreated';
+            return parsed !== null && parsed.name === "CampaignCreated";
           } catch {
             return false;
           }
@@ -486,7 +629,6 @@ export const adminCreateCampaign = createAsyncThunk(
 
       toast.success(`Campaign #${campaignId} created successfully!`);
       return campaignId;
-
     } catch (error) {
       console.error("Failed to create campaign:", error);
       const errorMessage = handleContractError(error);
@@ -498,23 +640,32 @@ export const adminCreateCampaign = createAsyncThunk(
 
 export const adminDeleteCampaign = createAsyncThunk(
   "admin/deleteCampaign",
-  async (campaignId: number, { rejectWithValue }) => {
-    const signer = await getCurrentSigner();
-
+  async (
+    { campaignId, signer }: { campaignId: number; signer: ethers.Signer },
+    { rejectWithValue }
+  ) => {
     if (!signer) {
       return rejectWithValue("Wallet not connected");
     }
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       // Validate contract
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
-        return rejectWithValue("Contract not found or invalid. Please check the contract address and deployment.");
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
       }
 
-      const result = await contract.getCampaignDetails.staticCall(campaignId) as CampaignDetailsResponse;
+      const result = (await contract.getCampaignDetails.staticCall(
+        campaignId
+      )) as CampaignDetailsResponse;
 
       if (!result.isOpen || result.isDeleted) {
         return rejectWithValue("Campaign is already closed or deleted");
@@ -522,7 +673,9 @@ export const adminDeleteCampaign = createAsyncThunk(
 
       const now = Math.floor(Date.now() / 1000);
       if (now >= Number(result.startDate)) {
-        return rejectWithValue("Cannot delete campaign that has already started");
+        return rejectWithValue(
+          "Cannot delete campaign that has already started"
+        );
       }
 
       const adminAddress = await contract.admin.staticCall();
@@ -531,7 +684,6 @@ export const adminDeleteCampaign = createAsyncThunk(
 
       toast.success(`Campaign #${campaignId} deleted successfully`);
       return campaignId;
-
     } catch (error) {
       console.error("Failed to delete campaign:", error);
       const errorMessage = handleContractError(error);
@@ -541,22 +693,55 @@ export const adminDeleteCampaign = createAsyncThunk(
   }
 );
 
+async function getCampaignList(contract: ethers.Contract) {
+  const nextId = await contract.nextCampaignId.staticCall();
+  const totalCampaigns = Number(nextId) - 1;
+  const campaigns = [];
+
+  for (let i = 1; i <= totalCampaigns; i++) {
+    try {
+      const details = await contract.getCampaignDetails.staticCall(i);
+      if (!details.isDeleted) {
+        campaigns.push({
+          id: i,
+          title: details.title,
+          startDate: Number(details.startDate),
+          endDate: Number(details.endDate),
+          status: details.status,
+        });
+      }
+    } catch (error) {
+      console.error(`Error fetching campaign ${i}:`, error);
+      continue;
+    }
+  }
+
+  return campaigns;
+}
+
 export const adminManualCloseCampaign = createAsyncThunk(
   "admin/manualCloseCampaign",
-  async (campaignId: number, { rejectWithValue }) => {
-    const signer = await getCurrentSigner();
-
+  async (
+    { campaignId, signer }: { campaignId: number; signer: ethers.Signer },
+    { rejectWithValue }
+  ) => {
     if (!signer) {
       return rejectWithValue("Wallet not connected");
     }
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       // Validate contract
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
-        return rejectWithValue("Contract not found or invalid. Please check the contract address and deployment.");
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
       }
 
       const tx = await contract.manualCloseCampaign(campaignId);
@@ -564,7 +749,6 @@ export const adminManualCloseCampaign = createAsyncThunk(
 
       toast.success(`Campaign #${campaignId} closed successfully`);
       return campaignId;
-
     } catch (error) {
       console.error("Failed to manually close campaign:", error);
       const errorMessage = handleContractError(error);
@@ -576,39 +760,50 @@ export const adminManualCloseCampaign = createAsyncThunk(
 
 export const adminProcessVerification = createAsyncThunk(
   "admin/processVerification",
-  async ({
-    userAddress,
-    approved,
-    feedback = ""
-  }: {
-    userAddress: string;
-    approved: boolean;
-    feedback?: string;
-  }, { rejectWithValue }) => {
-
-    const signer = await getCurrentSigner();
-
+  async (
+    {
+      userAddress,
+      approved,
+      feedback = "",
+      signer,
+    }: {
+      userAddress: string;
+      approved: boolean;
+      feedback?: string;
+      signer: ethers.Signer;
+    },
+    { rejectWithValue }
+  ) => {
     if (!signer) {
       return rejectWithValue("Wallet not connected");
     }
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       // Validate contract
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
-        return rejectWithValue("Contract not found or invalid. Please check the contract address and deployment.");
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
       }
 
-      const tx = await contract.processVerification(userAddress, approved, feedback);
+      const tx = await contract.processVerification(
+        userAddress,
+        approved,
+        feedback
+      );
       await tx.wait();
 
       const action = approved ? "approved" : "rejected";
       toast.success(`Verification request ${action} successfully`);
 
       return { userAddress, approved, feedback };
-
     } catch (error) {
       console.error("Failed to process verification:", error);
       const errorMessage = handleContractError(error);
@@ -620,18 +815,25 @@ export const adminProcessVerification = createAsyncThunk(
 
 export const getVerificationRequestDetails = createAsyncThunk(
   "admin/getVerificationRequestDetails",
-  async (userAddress: string, { rejectWithValue }) => {
-    const provider = getProvider();
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({userAddress, provider}: {userAddress: string, provider: ethers.Provider}, { rejectWithValue }) => {
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      provider
+    );
 
     try {
       // Validate contract
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
-        return rejectWithValue("Contract not found or invalid. Please check the contract address and deployment.");
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
       }
 
-      const request = await contract.verificationRequests.staticCall(userAddress);
+      const request = await contract.verificationRequests.staticCall(
+        userAddress
+      );
       const userDetails = await contract.userDetails.staticCall(userAddress);
 
       return {
@@ -640,8 +842,9 @@ export const getVerificationRequestDetails = createAsyncThunk(
         status: Number(request.status),
         verificationDocIpfsHash: request.verificationDocIpfsHash,
         adminFeedback: request.adminFeedback,
-        requestTimestamp: Number(request.requestTimestamp),
+        timestamp: Number(request.requestTimestamp),
         userName: request.userName,
+        requestTimestamp: Number(request.requestTimestamp),
         userInfo: {
           name: userDetails.name,
           email: userDetails.email,
@@ -650,12 +853,90 @@ export const getVerificationRequestDetails = createAsyncThunk(
           contactNumber: userDetails.contactNumber,
           bio: userDetails.bio,
           profileImageIpfsHash: userDetails.profileImageIpfsHash,
-          supportiveLinks: userDetails.supportiveLinks
-        }
+          supportiveLinks: userDetails.supportiveLinks,
+        },
       };
-
     } catch (error) {
       console.error("Failed to get verification request details:", error);
+      const errorMessage = handleContractError(error);
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const fetchVerificationRequests = createAsyncThunk(
+  "admin/fetchVerificationRequests",
+  async ({ signer }: { signer: ethers.Signer }, { rejectWithValue }) => {
+    try {
+      if (!signer) {
+        return rejectWithValue("Wallet not connected");
+      }
+
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        signer
+      );
+
+      // Validate contract
+      const isValidContract = await validateContract(contract);
+      if (!isValidContract) {
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
+      }
+
+      // Check if user is admin
+      const signerAddress = await signer.getAddress();
+      const contractAdmin = await contract.admin.staticCall();
+
+      if (signerAddress.toLowerCase() !== contractAdmin.toLowerCase()) {
+        return rejectWithValue(
+          "Access denied: Only admin can fetch verification requests"
+        );
+      }
+
+      const requestsData =
+        await contract.getPendingVerificationRequests.staticCall();
+      const verificationRequests: VerificationRequestData[] = [];
+
+      if (requestsData && requestsData.length >= 6) {
+        const [
+          userAddresses,
+          requestedRoles,
+          verificationDocIpfsHashes,
+          adminFeedbacks,
+          userNames,
+          timestamps,
+        ] = requestsData;
+
+        for (let i = 0; i < userAddresses.length; i++) {
+          verificationRequests.push({
+            userAddress: userAddresses[i],
+            requestedRole: Number(requestedRoles[i]),
+            verificationDocIpfsHash: verificationDocIpfsHashes[i],
+            adminFeedback: adminFeedbacks[i],
+            userName: userNames[i],
+            timestamp: Number(timestamps[i]),
+            requestTimestamp: Number(timestamps[i]),
+            status: RequestStatus.Pending,
+            userInfo: {
+              name: userNames[i],
+              email: "",
+              dateOfBirth: 0,
+              identityNumber: "",
+              contactNumber: "",
+              bio: "",
+              profileImageIpfsHash: "",
+              supportiveLinks: [],
+            },
+          });
+        }
+      }
+
+      return verificationRequests;
+    } catch (error) {
+      console.error("Failed to fetch verification requests:", error);
       const errorMessage = handleContractError(error);
       return rejectWithValue(errorMessage);
     }

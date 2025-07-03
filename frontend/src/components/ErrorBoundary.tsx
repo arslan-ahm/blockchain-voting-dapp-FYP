@@ -46,14 +46,14 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button
                 onClick={() => window.location.reload()}
                 variant="outline"
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50"
               >
                 <RefreshCcw className="w-4 h-4" />
                 Reload Page
               </Button>
               <Button
                 onClick={this.reset}
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 bg-clip-text text-transparent"
               >
                 Try Again
               </Button>

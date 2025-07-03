@@ -7,14 +7,36 @@ import type { RootState } from "../store";
 export const fetchCampaigns = createAsyncThunk(
   "campaign/fetchCampaigns",
   async (provider?: ethers.Provider) => {
+    if (!import.meta.env.VITE_RPC_URL) {
+      console.error("RPC URL is not configured");
+      throw new Error("RPC URL is not configured");
+    }
+    
+    if (!VOTING_CONTRACT_ADDRESS) {
+      console.error("Contract address is not configured");
+      throw new Error("Contract address is not configured");
+    }
+
     const contractProvider = provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
     const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, contractProvider);
 
     try {
-      const nextCampaignId = await contract.nextCampaignId();
+      // Get nearby campaigns first to find active campaign IDs
+      const campaignIds = await contract.getNearbyCampaigns();
+      
+      console.log("Found", campaignIds.length, "nearby campaigns");
+      
+      if (campaignIds.length === 0) {
+        console.log("No nearby campaigns found");
+        return [];
+      }
+      
       const campaigns = [];
+      console.log(`Fetching details for ${campaignIds.length} campaigns`);
 
-      for (let i = 1; i < nextCampaignId; i++) {
+      // Process each campaign ID from getNearbyCampaigns
+      for (let i = 0; i < campaignIds.length; i++) {
+        const campaignId = campaignIds[i];
         try {
           const [
             startDate,
@@ -29,11 +51,11 @@ export const fetchCampaigns = createAsyncThunk(
             voterCount,
             candidateCount,
             status
-          ] = await contract.getCampaignDetails(i);
+          ] = await contract.getCampaignDetails(campaignId);
 
           if (!isDeleted) {
             campaigns.push({
-              campaignId: i,
+              campaignId: Number(campaignId),
               startDate: startDate.toString(),
               endDate: endDate.toString(),
               winner,
@@ -49,15 +71,37 @@ export const fetchCampaigns = createAsyncThunk(
             });
           }
         } catch (error) {
-          console.warn(`Failed to fetch campaign ${i}:`, error);
+          console.warn(`Failed to fetch campaign ${campaignId}:`, error);
         }
       }
 
       return campaigns;
-    } catch (error) {
-      console.error("Error fetching campaigns:", error);
-      toast.error("Failed to fetch campaigns");
-      throw error;
+    } catch (error: unknown) {
+      interface ExtendedError extends Error {
+        code?: string;
+        reason?: string;
+      }
+      
+      const err = error as ExtendedError;
+      console.error("Error fetching campaigns:", err);
+      
+      let errorMessage = "Failed to fetch campaigns";
+      const message = err.message || '';
+      
+      if (err.code === 'NETWORK_ERROR' || err.code === 'SERVER_ERROR') {
+        errorMessage = `Network error: ${message || 'Unable to connect to the blockchain'}`;
+      } else if (err.code === 'CALL_EXCEPTION') {
+        errorMessage = `Contract error: ${err.reason || message || 'Invalid contract call'}`;
+      } else if (message.includes("missing provider")) {
+        errorMessage = "Web3 provider not available";
+      } else if (message.includes("invalid address")) {
+        errorMessage = "Invalid contract address";
+      }
+      
+      toast.error(errorMessage);
+      const newError = new Error(errorMessage);
+      Object.defineProperty(newError, 'cause', { value: error });
+      throw newError;
     }
   }
 );
