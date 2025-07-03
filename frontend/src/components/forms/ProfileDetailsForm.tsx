@@ -1,36 +1,17 @@
 import React from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
-import { Button } from "./ui/button";
-import { Input } from "./ui/input";
-import { Textarea } from "./ui/textarea";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "./ui/form";
-import { ImageUpload } from "./ImageUpload";
-import type { UseFormReturn } from "react-hook-form";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Textarea } from "../ui/textarea";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
+import { ImageUpload } from "../ImageUpload";
 import { Plus, X } from "lucide-react";
-import { cn } from "../utils/cn";
-import { dateToUnix } from "../utils/formatters";
-import { getIpfsUrl } from "../utils/ipfs";
+import { cn } from "../../utils/cn";
+import { dateToUnix } from "../../utils/formatters";
+import { getIpfsUrl } from "../../utils/ipfs";
+import type { ProfileDetailsFormProps } from "../../types/form";
 
-interface FromDataType {
-    name: string;
-    email: string;
-    dateOfBirth: number;
-    identityNumber: string;
-    contactNumber: string;
-    bio?: string | undefined;
-    profileImage?: File | undefined;
-    supportiveLinks?: string[] | undefined;
-}
-
-interface ProfileDetailsFormProps {
-  form: UseFormReturn<FromDataType>;
-  onSubmit: (values: FromDataType) => Promise<void>;
-  isLoading: boolean;
-  showSubmitButton?: boolean;
-  submitButtonText?: string;
-  currentProfileImage?: string;
-}
 
 export const ProfileDetailsForm: React.FC<ProfileDetailsFormProps> = ({
   form,

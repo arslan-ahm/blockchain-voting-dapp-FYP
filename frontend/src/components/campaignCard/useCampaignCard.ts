@@ -3,20 +3,22 @@ import { submitVote, registerForCampaign } from "../../store/thunks/campaignThun
 import { resetVoteStatus } from "../../store/slices/campaignSlice";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { Role, type Campaign } from "../../types";
+import { useWallet } from "../../hooks/useWallet";
 
 export const useCampaignCard = (campaign: Campaign) => {
   const dispatch = useAppDispatch();
-  const { status } = useAppSelector((state) => state.vote);
+  const status = useAppSelector((state) => state.user.status);
   const user = useAppSelector((state) => state.user);
-  const isVoter = user.role === Role.Voter;
-  const isRegistered = campaign.voters.includes(user.account || "") || campaign.candidates.includes(user.account || "");
+  const { signer } = useWallet();
+  const isVoter = user?.role === Role.Voter;
+  const isRegistered = campaign?.voters?.includes(user?.account || "") || campaign?.candidates?.includes(user?.account || "");
 
   const handleVote = (candidate: string) => {
-    dispatch(submitVote({ campaignId: campaign.id, candidate }));
+    dispatch(submitVote({ campaignId: campaign?.id, candidate }));
   };
 
   const handleRegister = () => {
-    dispatch(registerForCampaign(campaign.id));
+    dispatch(registerForCampaign({ campaignId: campaign?.id, signer: signer! }));
   };
 
   useEffect(() => {

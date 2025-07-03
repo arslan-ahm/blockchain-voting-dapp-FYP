@@ -31,7 +31,6 @@ import type {
 } from "../../types";
 
 
-
 const initialState: CampaignState = {
   status: "idle",
   error: null,

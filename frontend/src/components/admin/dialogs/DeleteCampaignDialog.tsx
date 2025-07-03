@@ -3,16 +3,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialo
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
-import type { Campaign } from '../../../types';
 import { Loader2 } from 'lucide-react';
-
-interface DeleteCampaignDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: (adminAddress: string) => void;
-  campaign: Campaign | null;
-  isLoading?: boolean;
-}
+import type { DeleteCampaignDialogProps } from '../../../types/dialog';
 
 export const DeleteCampaignDialog = ({ 
   isOpen, 

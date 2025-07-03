@@ -1,11 +1,6 @@
-import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { useEffect, useRef } from "react";
+import type { FloatingMenuProps } from "../types/floatingMenu";
 
-interface FloatingMenuProps {
-  anchorRef: RefObject<HTMLElement> | RefObject<HTMLDivElement> | RefObject<HTMLButtonElement>;
-  isOpen: boolean;
-  onClose: () => void;
-  children: ReactNode;
-}
 
 export const FloatingMenu = ({ anchorRef, isOpen, onClose, children }: FloatingMenuProps) => {
   const menuRef = useRef<HTMLDivElement>(null);

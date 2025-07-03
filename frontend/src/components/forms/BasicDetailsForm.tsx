@@ -4,18 +4,10 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Input } from "../ui/input";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "../ui/form";
 import { ImageUpload } from "../ImageUpload";
-import type { UseFormReturn } from "react-hook-form";
 import { cn } from "../../utils/cn";
 import { dateToUnix } from "../../utils/formatters";
 import { getIpfsUrl } from "../../utils/ipfs";
-import type { BasicDetailsFormData } from "../../pages/profile/useProfile";
-
-interface BasicDetailsFormProps {
-  form: UseFormReturn<BasicDetailsFormData>;
-  onSubmit: (values: BasicDetailsFormData) => Promise<void>;
-  isLoading: boolean;
-  currentProfileImage?: string;
-}
+import type { BasicDetailsFormProps } from "../../types/form";
 
 export const BasicDetailsForm: React.FC<BasicDetailsFormProps> = ({
   form,

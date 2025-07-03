@@ -1,20 +1,15 @@
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
-import { Badge } from '../ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Check, X, UserCheck, Eye, User, Calendar, Phone, Mail, FileText, ExternalLink } from 'lucide-react';
 import { useState } from 'react';
-import { EmptyState } from './EmptyState';
-import { Role, type VerificationRequestData } from '../../types';
+import { Check, X, UserCheck, Eye, User, Calendar, Phone, Mail, FileText, ExternalLink } from 'lucide-react';
 import { cn } from '../../utils/cn';
-
-interface VerificationRequestsProps {
-  requests: VerificationRequestData[];
-  onProcessVerification: (userAddress: string, approved: boolean, feedback: string) => Promise<void>;
-  isLoading?: boolean;
-  isProcessing?: boolean;
-}
+import { Badge } from '../ui/badge';
+import { Button } from '../ui/button';
+import { EmptyState } from './EmptyState';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Role, type VerificationRequestData } from '../../types';
+import type { VerificationRequestsProps } from '../../types/verificationRequests';
+import { getRoleBadgeColor } from '../../utils/helpers';
 
 export const VerificationRequests = ({ 
   requests, 
@@ -25,22 +20,6 @@ export const VerificationRequests = ({
   const [activeTab, setActiveTab] = useState("all");
   const [selectedRequest, setSelectedRequest] = useState<VerificationRequestData | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
-
-  const getRoleBadgeColor = (role: Role): string => {
-    switch (role) {
-      case Role.Candidate:
-      case Role.Voter:
-        return "bg-green-500/20 border-green-700 text-green-400";
-      case Role.PendingVerification:
-        return "bg-yellow-500/20 border-yellow-700 text-yellow-400";
-      case Role.Unverified:
-        return "bg-blue-500/20 border-blue-700 text-blue-400";
-      case Role.Admin:
-        return "bg-purple-500/20 border-purple-700 text-purple-400";
-      default:
-        return "bg-gray-500/20 border-gray-700 text-gray-400";
-    }
-  };
 
   const getRoleDisplay = (role: Role): string => {
     switch (role) {
@@ -177,7 +156,7 @@ export const VerificationRequests = ({
                       <Button
                         size="sm"
                         onClick={() => onProcessVerification(request.userAddress, true, '')}
-                        className="bg-green-600 hover:bg-green-700 text-white"
+                        className="bg-primary text-white"
                         disabled={isProcessing}
                       >
                         <Check className="w-4 h-4" />

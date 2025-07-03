@@ -43,10 +43,10 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
     }
     
     nearbyCampaigns.forEach(campaign => {
-      dispatch(getCampaignVoters({ campaignId: parseInt(campaign.campaignId), provider }));
+      dispatch(getCampaignVoters({ campaignId: campaign.id, provider }));
       if (userAddress) {
         dispatch(checkUserRegistration({ 
-          campaignId: parseInt(campaign.campaignId), 
+          campaignId: campaign.id, 
           userAddress,
           provider
         }));
@@ -69,6 +69,8 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
       console.error('Failed to cast vote:', error);
     }
   };
+
+  console.log(nearbyCampaigns)
 
   const getUserRegistration = (campaignId: string) => {
     return userRegistrations.find(
@@ -138,17 +140,17 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
         
         {nearbyCampaigns.map((campaign) => {
           const statusInfo = getCampaignStatus(campaign);
-          const userReg = getUserRegistration(campaign.campaignId);
-          const voters = campaignVoters[parseInt(campaign.campaignId)] || [];
+          const userReg = getUserRegistration(campaign?.id?.toString());
+          const voters = campaignVoters[campaign.id] || [];
           const candidates = voters.filter(voter => userRegistrations.some(
-            reg => reg.campaignId === parseInt(campaign.campaignId) && 
+            reg => reg.campaignId === campaign.id && 
                    reg.userAddress === voter.address && 
                    reg.isCandidate
           ));
           const regularVoters = voters.filter(voter => !candidates.some(c => c.address === voter.address));
 
           return (
-            <Card key={campaign.campaignId} className="bg-gray-800 border-gray-700 py-2">
+            <Card key={campaign.id?.toString()} className="bg-gray-800 border-gray-700 py-2">
               {/* Campaign Header */}
               <CardHeader>
                 <div className="flex justify-between items-start">
@@ -162,8 +164,8 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4 text-blue-400" />
                         <span>
-                          {new Date(parseInt(campaign.startDate) * 1000).toLocaleDateString()} - 
-                          {new Date(parseInt(campaign.endDate) * 1000).toLocaleDateString()}
+                          {new Date(campaign?.startDate * 1000).toLocaleDateString()} - 
+                          {new Date(campaign?.endDate * 1000).toLocaleDateString()}
                         </span>
                       </div>
                       <div className="flex items-center gap-1">
@@ -208,7 +210,7 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
                               
                               {userReg?.isVoter && statusInfo.status === 'active' && (
                                 <Button
-                                  onClick={() => handleVote(campaign.campaignId, candidate.address)}
+                                  onClick={() => handleVote(campaign.id?.toString(), candidate.address)}
                                   disabled={castingVote}
                                   variant="outline"
                                   size="sm"

@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
 import { ArrowDown, ChevronRight } from "lucide-react";
-import { features, steps, roadmapItems } from "./home.constants";
+import { features, steps, roadmapItems } from "../../constants/home";
 import GradientText from "../../components/GradientText";
 
 export const Home = () => {

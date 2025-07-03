@@ -11,20 +11,9 @@ import {
   FormMessage,
 } from "../ui/form";
 import { DocumentUpload } from "../DocumentUpload";
-import type { UseFormReturn } from "react-hook-form";
 import { Plus, X } from "lucide-react";
 import { cn } from "../../utils/cn";
-import type { VerificationFormData } from "../../pages/profile/useProfile";
-
-interface VerificationRequestFormProps {
-  form: UseFormReturn<VerificationFormData>;
-  onSubmit: (values: VerificationFormData) => Promise<void>;
-  isLoading: boolean;
-  supportiveLinks: string[];
-  addSupportiveLink: () => void;
-  removeSupportiveLink: (index: number) => void;
-  updateSupportiveLink: (index: number, value: string) => void;
-}
+import type { VerificationRequestFormProps } from "../../types/form";
 
 export const VerificationRequestForm: React.FC<VerificationRequestFormProps> = ({
   form,

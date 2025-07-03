@@ -28,6 +28,7 @@ import {
   selectClosingCampaign,
   selectCampaignList
 } from "../../store/slices/adminSlice";
+import type { ChartDataPoint, LineChartDataPoint } from "../../types/adminDashboard";
 
 const campaignSchema = z
   .object({
@@ -47,19 +48,6 @@ const campaignSchema = z
   });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
-
-interface ChartDataPoint {
-  name: string;
-  value: number;
-  color?: string;
-}
-
-interface LineChartDataPoint {
-  date: string;
-  campaigns: number;
-  participants: number;
-  votes: number;
-}
 
 export const useAdminDashboard = () => {
   const dispatch = useAppDispatch();
@@ -131,6 +119,184 @@ export const useAdminDashboard = () => {
     }
   }, [selectedCampaign, dispatch, signer, provider]);
 
+  // Calculate dashboard stats
+  const calculateDashboardStats = () => {
+    const totalCampaigns = campaignList.length;
+    const activeCampaigns = campaignList.filter(c => c.status === 1).length;
+    const completedCampaigns = campaignList.filter(c => c.status === 2).length;
+    const upcomingCampaigns = campaignList.filter(c => c.status === 0).length;
+    const totalParticipants = (adminDashboard?.participantStats.candidateCount ?? 0) + (adminDashboard?.participantStats.voterCount ?? 0);
+    const totalVotes = adminDashboard?.voteStats.votedCount ?? 0;
+    const pendingVerifications = verificationRequests.filter(r => r.status === 0).length;
+    const totalVoters = adminDashboard?.voteStats.totalVoters ?? 0;
+    const votePercentage = totalVoters > 0 ? Math.round((totalVotes / totalVoters) * 100) : 0;
+
+    return {
+      totalCampaigns,
+      activeCampaigns,
+      completedCampaigns,
+      upcomingCampaigns,
+      totalParticipants,
+      totalVotes,
+      pendingVerifications,
+      totalVoters,
+      votePercentage,
+    };
+  };
+
+  // Calculate participant chart data
+  const calculateParticipantChartData = (): ChartDataPoint[] => {
+    const candidates = adminDashboard?.candidates ?? [];
+    const voters = adminDashboard?.voters ?? [];
+    
+    return [
+      { 
+        name: "Candidates", 
+        value: candidates.length, 
+        color: "#8884d8",
+        percentage: Math.round((candidates.length / (candidates.length + voters.length || 1)) * 100)
+      },
+      { 
+        name: "Voters", 
+        value: voters.length, 
+        color: "#82ca9d",
+        percentage: Math.round((voters.length / (candidates.length + voters.length || 1)) * 100)
+      },
+    ];
+  };
+
+  // Calculate vote status chart data
+  const calculateVoteStatusChartData = (): ChartDataPoint[] => {
+    const votedCount = adminDashboard?.voteStats.votedCount ?? 0;
+    const notVotedCount = adminDashboard?.voteStats.notVotedCount ?? 0;
+    const totalVoters = votedCount + notVotedCount;
+    
+    return [
+      { 
+        name: "Voted", 
+        value: votedCount, 
+        color: "#00C49F",
+        percentage: totalVoters > 0 ? Math.round((votedCount / totalVoters) * 100) : 0
+      },
+      { 
+        name: "Not Voted", 
+        value: notVotedCount, 
+        color: "#FF8042",
+        percentage: totalVoters > 0 ? Math.round((notVotedCount / totalVoters) * 100) : 0
+      },
+    ];
+  };
+
+  // Calculate line chart data for campaigns over time
+  const calculateLineChartData = (): LineChartDataPoint[] => {
+    const monthlyData: { [key: string]: LineChartDataPoint } = {};
+    
+    campaignList.forEach(campaign => {
+      const date = new Date((campaign.startDate ?? 0) * 1000);
+      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          date: monthKey, 
+          campaigns: 0, 
+          participants: 0, 
+          votes: 0,
+          active: 0,
+          completed: 0
+        } as LineChartDataPoint;
+      }
+      
+      const currentData = monthlyData[monthKey];
+      currentData.campaigns++;
+      
+      // Add status-based counting
+      if (campaign.status === 1) {
+        currentData.active = (currentData.active || 0) + 1;
+      } else if (campaign.status === 2) {
+        currentData.completed = (currentData.completed || 0) + 1;
+      }
+    });
+
+    // Add participant and vote data for each month
+    Object.keys(monthlyData).forEach(monthKey => {
+      // For now, we'll use current dashboard data
+      // In a real implementation, you'd want historical data
+      if (adminDashboard) {
+        monthlyData[monthKey].participants = adminDashboard.participantStats.candidateCount + adminDashboard.participantStats.voterCount;
+        monthlyData[monthKey].votes = adminDashboard.voteStats.votedCount;
+      }
+    });
+
+    return Object.values(monthlyData).sort((a, b) => a.date.localeCompare(b.date));
+  };
+
+  // Calculate candidate performance chart data
+  const calculateCandidatePerformanceData = (): ChartDataPoint[] => {
+    const candidates = adminDashboard?.candidates ?? [];
+    const totalVotes = candidates.reduce((sum, candidate) => sum + candidate.voteCount, 0);
+    
+    return candidates.map((candidate, index) => ({
+      name: candidate.name || `Candidate ${index + 1}`,
+      value: candidate.voteCount,
+      color: `hsl(${(index * 45) % 360}, 70%, 60%)`,
+      percentage: totalVotes > 0 ? Math.round((candidate.voteCount / totalVotes) * 100) : 0,
+      address: candidate.address
+    }));
+  };
+
+  // Calculate campaign status distribution
+  const calculateCampaignStatusData = (): ChartDataPoint[] => {
+    const statusCounts = campaignList.reduce((acc, campaign) => {
+      switch (campaign.status) {
+        case 0:
+          acc.upcoming++;
+          break;
+        case 1:
+          acc.active++;
+          break;
+        case 2:
+          acc.completed++;
+          break;
+        default:
+          acc.other++;
+      }
+      return acc;
+    }, { upcoming: 0, active: 0, completed: 0, other: 0 });
+
+    return [
+      { name: "Upcoming", value: statusCounts.upcoming, color: "#FFA500", percentage: Math.round((statusCounts.upcoming / campaignList.length) * 100) },
+      { name: "Active", value: statusCounts.active, color: "#00C49F", percentage: Math.round((statusCounts.active / campaignList.length) * 100) },
+      { name: "Completed", value: statusCounts.completed, color: "#8884d8", percentage: Math.round((statusCounts.completed / campaignList.length) * 100) },
+      { name: "Other", value: statusCounts.other, color: "#FF8042", percentage: Math.round((statusCounts.other / campaignList.length) * 100) },
+    ].filter(item => item.value > 0);
+  };
+
+  // Calculate verification requests chart data
+  const calculateVerificationRequestsData = (): ChartDataPoint[] => {
+    const requestCounts = verificationRequests.reduce((acc, request) => {
+      switch (request.status) {
+        case 0:
+          acc.pending++;
+          break;
+        case 1:
+          acc.approved++;
+          break;
+        case 2:
+          acc.rejected++;
+          break;
+        default:
+          acc.other++;
+      }
+      return acc;
+    }, { pending: 0, approved: 0, rejected: 0, other: 0 });
+
+    return [
+      { name: "Pending", value: requestCounts.pending, color: "#FFA500", percentage: Math.round((requestCounts.pending / verificationRequests.length) * 100) },
+      { name: "Approved", value: requestCounts.approved, color: "#00C49F", percentage: Math.round((requestCounts.approved / verificationRequests.length) * 100) },
+      { name: "Rejected", value: requestCounts.rejected, color: "#FF8042", percentage: Math.round((requestCounts.rejected / verificationRequests.length) * 100) },
+    ].filter(item => item.value > 0);
+  };
+
   // Handlers
   const handleSelectCampaign = (campaignId: number) => {
     setSelectedCampaign(campaignId);
@@ -179,8 +345,8 @@ export const useAdminDashboard = () => {
     const campaignData = {
       title: values.title,
       description: values.description,
-      startDate: values.startDate, // Already a timestamp
-      endDate: values.endDate,     // Already a timestamp
+      startDate: values.startDate,
+      endDate: values.endDate,
       detailsIpfsHash: campaignDetailsIpfsHash || '',
       signer,
     };
@@ -224,7 +390,6 @@ export const useAdminDashboard = () => {
     try {
       await dispatch(adminProcessVerification({ userAddress, approved, feedback, signer })).unwrap();
       toast.success("Verification processed successfully");
-      // Re-fetch requests to update the list
       dispatch(fetchVerificationRequests({ signer }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -238,36 +403,14 @@ export const useAdminDashboard = () => {
   const candidates = adminDashboard?.candidates ?? [];
   const voters = adminDashboard?.voters ?? [];
 
-  const participantChartData: ChartDataPoint[] = [
-    { name: "Candidates", value: candidates.length, color: "#8884d8" },
-    { name: "Voters", value: voters.length, color: "#82ca9d" },
-  ];
-
-  const voteStatusChartData: ChartDataPoint[] = [
-    { name: "Voted", value: adminDashboard?.voteStats.votedCount ?? 0, color: "#00C49F" },
-    { name: "Not Voted", value: adminDashboard?.voteStats.notVotedCount ?? 0, color: "#FF8042" },
-  ];
-
-  const lineChartData: LineChartDataPoint[] = campaignList.reduce<LineChartDataPoint[]>((acc, campaign) => {
-    const date = new Date((campaign.startDate ?? 0) * 1000);
-    const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    let monthData = acc.find(d => d.date === monthKey);
-    if (!monthData) {
-      monthData = { date: monthKey, campaigns: 0, participants: 0, votes: 0 };
-      acc.push(monthData);
-    }
-    monthData.campaigns++;
-    return acc;
-  }, []).sort((a, b) => a.date.localeCompare(b.date));
-
-  const dashboardStats = {
-    totalCampaigns: campaignList.length,
-    activeCampaigns: campaignList.filter(c => c.status === 1).length,
-    completedCampaigns: campaignList.filter(c => c.status === 2).length,
-    totalParticipants: (adminDashboard?.participantStats.candidateCount ?? 0) + (adminDashboard?.participantStats.voterCount ?? 0),
-    totalVotes: adminDashboard?.voteStats.votedCount ?? 0,
-    pendingVerifications: verificationRequests.filter(r => r.status === 0).length,
-  };
+  // Calculate all chart data
+  const dashboardStats = calculateDashboardStats();
+  const participantChartData = calculateParticipantChartData();
+  const voteStatusChartData = calculateVoteStatusChartData();
+  const lineChartData = calculateLineChartData();
+  const candidatePerformanceData = calculateCandidatePerformanceData();
+  const campaignStatusData = calculateCampaignStatusData();
+  const verificationRequestsData = calculateVerificationRequestsData();
 
   const campaignStats = campaigns.map(c => ({
     ...c,
@@ -281,24 +424,29 @@ export const useAdminDashboard = () => {
     selectedCampaignData,
     verificationRequests,
     adminDashboard,
-    dashboardStats,
-    participantChartData,
-    voteStatusChartData,
-    lineChartData,
+    candidates,
+    voters,
     activeTab,
     showCreateModal,
     showDeleteModal,
     campaignToDelete,
     campaignForm,
     adminLoading,
-
     isLoadingCampaignData,
     isUploading,
-    // verificationLoading,
     creatingCampaign,
     deletingCampaign,
     closingCampaign,
     processingVerification,
+    
+    // Dashboard Stats & Chart Data
+    dashboardStats,
+    participantChartData,
+    voteStatusChartData,
+    lineChartData,
+    candidatePerformanceData,
+    campaignStatusData,
+    verificationRequestsData,
 
     // Handlers & Actions
     handleSelectCampaign,

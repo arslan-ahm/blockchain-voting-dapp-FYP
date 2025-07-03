@@ -1,12 +1,8 @@
 import { useState, useCallback } from "react";
 import { Upload } from "lucide-react";
 import { cn } from "../utils/cn";
+import type { ImageUploadProps } from "../types/uploads";
 
-interface ImageUploadProps {
-  onChange: (file: File | null) => void;
-  preview?: string;
-  className?: string;
-}
 
 export const ImageUpload = ({ onChange, preview, className }: ImageUploadProps) => {
   const [dragActive, setDragActive] = useState(false);

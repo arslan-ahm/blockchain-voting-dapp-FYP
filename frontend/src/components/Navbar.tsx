@@ -16,15 +16,9 @@ import { toast } from 'sonner';
 import { useWallet } from '../hooks/useWallet';
 import { Role } from '../types';
 import { cn } from '../utils/cn';
+import { LANDING_PAGE_SECTIONS } from '../constants/navigation';
 
-// Landing page sections for smooth scroll
-const landingPageSections = [
-  { label: 'Home', id: '#hero' },
-  { label: 'About', id: '#about' },
-  { label: 'Features', id: '#features' },
-  { label: 'How It Works', id: '#how-it-works' },
-  { label: 'Roadmap', id: '#roadmap' }
-];
+
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -141,7 +135,7 @@ export const Navbar = () => {
         <nav className="hidden lg:flex items-center">
           {/* Landing page sections - Always visible */}
           <div className="flex items-center space-x-4">
-            {landingPageSections.map((section) => (
+            {LANDING_PAGE_SECTIONS.map((section) => (
               <button
                 key={section.id}
                 onClick={() => handleSmoothScroll(section.id)}
@@ -241,7 +235,7 @@ export const Navbar = () => {
                 {/* Mobile Navigation Links */}
                 <div className="flex flex-col gap-4">
                   {/* Landing page sections - Always visible */}
-                  {landingPageSections.map((section) => (
+                  {LANDING_PAGE_SECTIONS.map((section) => (
                     <button
                       key={section.id}
                       onClick={() => {

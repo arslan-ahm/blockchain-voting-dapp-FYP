@@ -7,25 +7,9 @@ import { getIpfsUrl } from "../utils/ipfs";
 import { formatDate } from "../utils/formatters";
 import { Role } from "../types";
 import { cn } from "../utils/cn";
-import type { UserState } from "../store/slices/userSlice";
+import type { ProfilePreviewProps } from "../types/profilePreview";
+import { getRoleBadgeColor } from "../utils/helpers";
 
-interface UserDetails {
-  name?: string;
-  email?: string;
-  contactNumber?: string;
-  dateOfBirth?: number;
-  identityNumber?: string;
-  bio?: string;
-  profileImageIpfsHash?: string;
-  supportiveLinks?: string[];
-}
-
-
-interface ProfilePreviewProps {
-  watchedValues: Partial<UserDetails>;
-  previewImageUrl: string;
-  currentUser: UserState;
-}
 
 export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
   watchedValues,
@@ -65,22 +49,6 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
     return roleNames[role] || "Unknown";
   };
 
-  const getRoleBadgeColor = (role: Role): string => {
-    switch (role) {
-      case Role.Candidate:
-      case Role.Voter:
-        return "bg-green-500/20 border-green-700 text-green-400";
-      case Role.PendingVerification:
-        return "bg-yellow-500/20 border-yellow-700 text-yellow-400";
-      case Role.Unverified:
-        return "bg-blue-500/20 border-blue-700 text-blue-400";
-      case Role.Admin:
-        return "bg-purple-500/20 border-purple-700 text-purple-400";
-      default:
-        return "bg-gray-500/20 border-gray-700 text-gray-400";
-    }
-  };
-
   return (
     <Card className="bg-gray-800 border-gray-700 py-4">
       <CardHeader>
@@ -101,14 +69,14 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
           
           <h3 className="text-lg font-semibold text-gray-200 mb-2">
             {getDisplayValue(
-              watchedValues.name,
-              currentUser.details?.name,
+              watchedValues?.name,
+              currentUser?.details?.name,
               "(Your Name)"
             )}
           </h3>
           
-          <Badge className={cn("select-none", getRoleBadgeColor(currentUser.role))}>
-            {getRoleDisplay(currentUser.role)}
+          <Badge className={cn("select-none", getRoleBadgeColor(currentUser?.role))}>
+            {getRoleDisplay(currentUser?.role)}
           </Badge>
         </div>
 
@@ -120,8 +88,8 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
               <p className="text-sm text-gray-400">Email</p>
               <p className="text-gray-200 break-all">
                 {getDisplayValue(
-                  watchedValues.email,
-                  currentUser.details?.email,
+                  watchedValues?.email,
+                  currentUser?.details?.email,
                   "(Your Email)"
                 )}
               </p>
@@ -134,8 +102,8 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
               <p className="text-sm text-gray-400">Contact Number</p>
               <p className="text-gray-200">
                 {getDisplayValue(
-                  watchedValues.contactNumber,
-                  currentUser.details?.contactNumber,
+                  watchedValues?.contactNumber,
+                  currentUser?.details?.contactNumber,
                   "(Contact Number)"
                 )}
               </p>
@@ -147,9 +115,9 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
             <div className="min-w-0 flex-1">
               <p className="text-sm text-gray-400">Date of Birth</p>
               <p className="text-gray-200">
-                {watchedValues.dateOfBirth && watchedValues.dateOfBirth !== 0
-                  ? getFormattedDate(watchedValues.dateOfBirth)
-                  : getFormattedDate(currentUser.details?.dateOfBirth)
+                {watchedValues?.dateOfBirth && watchedValues?.dateOfBirth !== 0
+                  ? getFormattedDate(watchedValues?.dateOfBirth)
+                  : getFormattedDate(currentUser?.details?.dateOfBirth)
                 }
               </p>
             </div>
@@ -161,8 +129,8 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
               <p className="text-sm text-gray-400">Identity Number</p>
               <p className="text-gray-200">
                 {getDisplayValue(
-                  watchedValues.identityNumber,
-                  currentUser.details?.identityNumber,
+                  watchedValues?.identityNumber,
+                  currentUser?.details?.identityNumber,
                   "(Identity Number)"
                 )}
               </p>
@@ -171,7 +139,7 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
         </div>
 
         {/* Bio Section */}
-        {(watchedValues.bio || currentUser.details?.bio) && (
+        {(watchedValues?.bio || currentUser?.details?.bio) && (
           <div className="border-t border-gray-700 pt-4">
             <div className="flex items-start gap-3">
               <FileText className="h-4 w-4 text-gray-400 mt-1 flex-shrink-0" />
@@ -179,8 +147,8 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
                 <p className="text-sm text-gray-400 mb-2">Bio</p>
                 <p className="text-gray-200 text-sm leading-relaxed">
                   {getDisplayValue(
-                    watchedValues.bio,
-                    currentUser.details?.bio,
+                    watchedValues?.bio,
+                    currentUser?.details?.bio,
                     "(No bio available)"
                   )}
                 </p>
@@ -190,8 +158,8 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
         )}
 
         {/* Supportive Links */}
-        {((watchedValues.supportiveLinks && watchedValues.supportiveLinks.length > 0) ||
-          (currentUser.details?.supportiveLinks && currentUser.details.supportiveLinks.length > 0)) && (
+        {((watchedValues?.supportiveLinks && watchedValues?.supportiveLinks?.length > 0) ||
+          (currentUser?.details?.supportiveLinks && currentUser?.details?.supportiveLinks?.length > 0)) && (
           <div className="border-t border-gray-700 pt-4">
             <div className="flex items-start gap-3">
               <ExternalLink className="h-4 w-4 text-gray-400 mt-1 flex-shrink-0" />
@@ -200,9 +168,9 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
                 <div className="space-y-2">
                   {((watchedValues?.supportiveLinks?.length ?? 0) > 0 
                     ? watchedValues.supportiveLinks! 
-                    : currentUser.details?.supportiveLinks || []
+                    : currentUser?.details?.supportiveLinks || []
                   ).map((link: string, index: number) => (
-                    link.trim() && (
+                    link?.trim() && (
                       <a
                         key={index}
                         href={link}
@@ -226,22 +194,22 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
             <p className="text-sm text-gray-400 mb-2">Profile Completion</p>
             <div className="space-y-1">
               {[
-                { label: "Name", completed: !!(watchedValues.name || currentUser.details?.name) },
-                { label: "Email", completed: !!(watchedValues.email || currentUser.details?.email) },
-                { label: "Date of Birth", completed: !!(watchedValues.dateOfBirth || currentUser.details?.dateOfBirth) },
-                { label: "Identity Number", completed: !!(watchedValues.identityNumber || currentUser.details?.identityNumber) },
-                { label: "Contact Number", completed: !!(watchedValues.contactNumber || currentUser.details?.contactNumber) },
+                { label: "Name", completed: !!(watchedValues?.name || currentUser?.details?.name) },
+                { label: "Email", completed: !!(watchedValues?.email || currentUser?.details?.email) },
+                { label: "Date of Birth", completed: !!(watchedValues?.dateOfBirth || currentUser?.details?.dateOfBirth) },
+                { label: "Identity Number", completed: !!(watchedValues?.identityNumber || currentUser?.details?.identityNumber) },
+                { label: "Contact Number", completed: !!(watchedValues?.contactNumber || currentUser?.details?.contactNumber) },
               ].map((item, index) => (
                 <div key={index} className="flex items-center gap-2">
                   <div
                     className={`h-2 w-2 rounded-full ${
-                      item.completed ? "bg-green-500" : "bg-gray-500"
+                      item?.completed ? "bg-green-500" : "bg-gray-500"
                     }`}
                   />
                   <span className={`text-xs ${
                     item.completed ? "text-green-400" : "text-gray-500"
                   }`}>
-                    {item.label}
+                    {item?.label}
                   </span>
                 </div>
               ))}

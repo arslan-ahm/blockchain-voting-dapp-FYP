@@ -1,12 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Upload, FileText, X } from "lucide-react";
 import { cn } from "../utils/cn";
-
-interface DocumentUploadProps {
-  onChange: (file: File | undefined) => void;
-  className?: string;
-  accept?: string;
-}
+import type { DocumentUploadProps } from "../types/uploads";
 
 export const DocumentUpload: React.FC<DocumentUploadProps> = ({
   onChange,

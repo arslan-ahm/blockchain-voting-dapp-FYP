@@ -3,27 +3,28 @@ import { Navigate } from "react-router-dom";
 import { useAppSelector } from "../hooks/useRedux";
 import { checkRouteAccess, type RouteConfig } from "./routes";
 
-interface PrivateRouteProps {
-    children: JSX.Element;
-    routeConfig: RouteConfig;
-}
+export const PrivateRoute = ({
+  children,
+  routeConfig,
+}: {
+  children: JSX.Element;
+  routeConfig: RouteConfig;
+}) => {
+  const user = useAppSelector((state) => state.user);
 
-export const PrivateRoute = ({ children, routeConfig }: PrivateRouteProps) => {
-    const user = useAppSelector((state) => state.user);
+  const { canAccess, redirectTo } = checkRouteAccess(
+    user.account ?? "",
+    user.role,
+    routeConfig
+  );
 
-    const { canAccess, redirectTo } = checkRouteAccess(
-        user.account ?? "",
-        user.role,
-        routeConfig
-    );
+  if (!canAccess && redirectTo) {
+    return <Navigate to={redirectTo} replace />;
+  }
 
-    if (!canAccess && redirectTo) {
-        return <Navigate to={redirectTo} replace />;
-    }
+  if (canAccess) {
+    return children;
+  }
 
-    if (canAccess) {
-        return children;
-    }
-
-    return <Navigate to="/" replace />;
+  return <Navigate to="/" replace />;
 };

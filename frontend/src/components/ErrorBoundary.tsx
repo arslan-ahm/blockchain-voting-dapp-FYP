@@ -1,24 +1,16 @@
-import { Component, type ReactNode } from 'react';
+import { Component } from 'react';
 import { AlertCircle, RefreshCcw } from 'lucide-react';
 import { Button } from './ui/button';
+import type { ErrorBoundaryProps, ErrorBoundaryState } from '../types/errorBoundary';
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-}
 
-interface State {
-  hasError: boolean;
-  error: Error | null;
-}
-
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
     hasError: false,
     error: null
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 

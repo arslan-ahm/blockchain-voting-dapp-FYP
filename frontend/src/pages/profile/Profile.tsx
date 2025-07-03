@@ -17,9 +17,11 @@ import { ProfilePreview } from "../../components/ProfilePreview";
 export const Profile = () => {
   const {
     user,
+
     // Basic Details Form
     basicDetailsForm,
     onBasicDetailsSubmit,
+
     // Verification Form
     verificationForm,
     onVerificationSubmit,
@@ -28,6 +30,7 @@ export const Profile = () => {
     removeSupportiveLink,
     updateSupportiveLink,
     isVerificationLoading,
+    
     // Common
     isLoading,
     canUpdateProfile,

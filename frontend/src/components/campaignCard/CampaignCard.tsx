@@ -23,22 +23,22 @@ export const CampaignCard = ({ campaign }: { campaign: Campaign }) => {
   return (
     <Card ref={cardRef} className="bg-gray-800 border-gray-700 hover:shadow-lg transition-shadow">
       <CardHeader>
-        <CardTitle className="text-xl text-blue-400">Campaign #{campaign.id}</CardTitle>
+        <CardTitle className="text-xl text-blue-400">Campaign #{campaign?.id}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-gray-300">Start: {formatDate(campaign.startDate)}</p>
-        <p className="text-gray-300">End: {formatDate(campaign.endDate)}</p>
-        <p className="text-gray-300">Status: {campaign.isOpen ? "Open" : "Closed"}</p>
-        <p className="text-gray-300 truncate">Details IPFS: {campaign.detailsIpfsHash}</p>
-        {campaign.winner !== ethers.ZeroAddress && (
-          <p className="text-green-400 font-bold">Winner: {formatAddress(campaign.winner)}</p>
+        <p className="text-gray-300">Start: {formatDate(campaign?.startDate)}</p>
+        <p className="text-gray-300">End: {formatDate(campaign?.endDate)}</p>
+        <p className="text-gray-300">Status: {campaign?.isOpen ? "Open" : "Closed"}</p>
+        <p className="text-gray-300 truncate">Details IPFS: {campaign?.detailsIpfsHash}</p>
+        {campaign?.winner !== ethers.ZeroAddress && (
+          <p className="text-green-400 font-bold">Winner: {formatAddress(campaign?.winner)}</p>
         )}
         <h4 className="mt-4 text-gray-200">Candidates:</h4>
         <ul className="space-y-2">
-          {campaign.candidates.map((candidate) => (
+          {campaign?.candidates?.map((candidate) => (
             <li key={candidate} className="flex justify-between items-center">
               <span className="text-sm font-mono">{formatAddress(candidate)}</span>
-              {campaign.isOpen && isVoter && isRegistered && (
+              {campaign?.isOpen && isVoter && isRegistered && (
                 <Button
                   onClick={() => handleVote(candidate)}
                   disabled={status === "pending"}
@@ -50,7 +50,7 @@ export const CampaignCard = ({ campaign }: { campaign: Campaign }) => {
             </li>
           ))}
         </ul>
-        {campaign.isOpen && !isRegistered && (
+        {campaign?.isOpen && !isRegistered && (
           <Button
             onClick={handleRegister}
             disabled={status === "pending"}

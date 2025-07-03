@@ -234,7 +234,7 @@ export const useProfile = () => {
       if (!validateBasicDetailsForm()) {
         return;
       }
-
+  
       let profileImageIpfsHash = user.details?.profileImageIpfsHash || "";
       
       // Upload new profile image if provided
@@ -258,17 +258,25 @@ export const useProfile = () => {
         profileImageIpfsHash,
         supportiveLinks: values.supportiveLinks?.filter(link => link.trim()) || [],
       }
-
+  
       if (!signer) {
         toast.error("Wallet not connected");
         return;
       }
-
+  
       await dispatch(
         updateUserDetails({ details: userDetails, signer })
       ).unwrap();
       
       toast.success("Profile updated successfully");
+      
+      // Reset the form but keep the image state
+      const currentImageFile = basicDetailsForm.getValues('profileImage');
+      basicDetailsForm.reset({
+        ...userDetails,
+        profileImage: currentImageFile, // Keep the current image file
+      });
+      
     } catch (error) {
       console.error("Failed to update user details:", error);
       if (error instanceof Error) {

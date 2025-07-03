@@ -110,21 +110,21 @@ export const useCampaignList = ({
   const canUserVote = useCallback((campaignId: number) => {
     const registration = getUserRegistration(campaignId);
     const vote = getUserVote(campaignId);
-    const campaign = nearbyCampaigns.find(c => parseInt(c.campaignId) === campaignId);
+    const campaign = nearbyCampaigns.find(c => c.id === campaignId);
     
     return (
       registration?.isVoter &&
       !vote?.votedCandidate &&
       campaign?.isOpen &&
-      parseInt(campaign.endDate) > Math.floor(Date.now() / 1000)
+      campaign.endDate > Math.floor(Date.now() / 1000)
     );
   }, [getUserRegistration, getUserVote, nearbyCampaigns]);
 
   // Get campaign status
   const getCampaignStatus = useCallback((campaign: typeof nearbyCampaigns[0]) => {
     const now = Math.floor(Date.now() / 1000);
-    const startDate = parseInt(campaign.startDate);
-    const endDate = parseInt(campaign.endDate);
+    const startDate = campaign.startDate;
+    const endDate = campaign.endDate;
 
     if (now < startDate) return 'upcoming';
     if (now > endDate || !campaign.isOpen) return 'ended';
@@ -149,7 +149,7 @@ export const useCampaignList = ({
   // Fetch detailed data for all nearby campaigns
   useEffect(() => {
     nearbyCampaigns.forEach(campaign => {
-      fetchCampaignDetails(parseInt(campaign.campaignId));
+      fetchCampaignDetails(campaign.id);
     });
   }, [nearbyCampaigns, fetchCampaignDetails]);
 

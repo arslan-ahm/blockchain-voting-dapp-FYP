@@ -4,25 +4,8 @@ import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { ChevronDown, Upload, AlertCircle } from 'lucide-react';
-import type { UseFormReturn } from 'react-hook-form';
 import { UploadFloatingMenu } from './UploadFloatingMenu';
-
-interface CampaignFormData {
-  title: string;
-  startDate: number;
-  endDate: number;
-  description: string;
-  campaignDetails: string;
-  campaignDocument?: File;
-}
-
-interface AddCampaignDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: CampaignFormData) => Promise<string | number | undefined>;
-  form: UseFormReturn<CampaignFormData>;
-  isCreating: boolean;
-}
+import type { AddCampaignDialogProps } from '../../../types/dialog';
 
 export const AddCampaignDialog = ({ 
   isOpen, 
