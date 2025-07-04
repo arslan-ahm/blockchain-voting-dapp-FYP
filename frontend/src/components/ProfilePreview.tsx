@@ -7,11 +7,24 @@ import { getIpfsUrl } from "../utils/ipfs";
 import { formatDate } from "../utils/formatters";
 import { Role } from "../types";
 import { cn } from "../utils/cn";
+import type { UserState } from "../store/slices/userSlice";
+
+interface UserDetails {
+  name?: string;
+  email?: string;
+  contactNumber?: string;
+  dateOfBirth?: number;
+  identityNumber?: string;
+  bio?: string;
+  profileImageIpfsHash?: string;
+  supportiveLinks?: string[];
+}
+
 
 interface ProfilePreviewProps {
-  watchedValues: Record<string, any>;
+  watchedValues: Partial<UserDetails>;
   previewImageUrl: string;
-  currentUser: Record<string, any>;
+  currentUser: UserState;
 }
 
 export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
@@ -19,7 +32,11 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
   previewImageUrl,
   currentUser,
 }) => {
-  const getDisplayValue = (newValue: any, currentValue: any, fallback: string = "Not provided") => {
+  const getDisplayValue = <T,>(
+    newValue: T | undefined | null,
+    currentValue: T | undefined | null,
+    fallback: string = "Not provided"
+  ): T | string => {
     if (newValue !== undefined && newValue !== null && newValue !== "") {
       return newValue;
     }
@@ -29,7 +46,7 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
     return fallback;
   };
 
-  const getImageUrl = () => {
+  const getImageUrl = (): string | undefined => {
     if (previewImageUrl) return previewImageUrl;
     if (currentUser.details?.profileImageIpfsHash) {
       return getIpfsUrl(currentUser.details.profileImageIpfsHash);
@@ -37,19 +54,21 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
     return undefined;
   };
 
-  const getFormattedDate = (timestamp: number) => {
+  const getFormattedDate = (timestamp: number | undefined | null) => {
+    if (!timestamp) return "Not provided";
     if (!timestamp || timestamp === 0) return "Not provided";
     return formatDate(timestamp);
   };
 
-  const getRoleDisplay = (role: Role) => {
+  const getRoleDisplay = (role: Role): string => {
     const roleNames = Object.keys(Role);
     return roleNames[role] || "Unknown";
   };
 
-  const getRoleBadgeColor = (role: Role) => {
+  const getRoleBadgeColor = (role: Role): string => {
     switch (role) {
-      case Role.Candidate || Role.Voter:
+      case Role.Candidate:
+      case Role.Voter:
         return "bg-green-500/20 border-green-700 text-green-400";
       case Role.PendingVerification:
         return "bg-yellow-500/20 border-yellow-700 text-yellow-400";
@@ -179,8 +198,8 @@ export const ProfilePreview: React.FC<ProfilePreviewProps> = ({
               <div className="min-w-0 flex-1">
                 <p className="text-sm text-gray-400 mb-2">Supportive Links</p>
                 <div className="space-y-2">
-                  {(watchedValues.supportiveLinks?.length > 0 
-                    ? watchedValues.supportiveLinks 
+                  {((watchedValues?.supportiveLinks?.length ?? 0) > 0 
+                    ? watchedValues.supportiveLinks! 
                     : currentUser.details?.supportiveLinks || []
                   ).map((link: string, index: number) => (
                     link.trim() && (

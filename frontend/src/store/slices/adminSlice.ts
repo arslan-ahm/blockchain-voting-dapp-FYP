@@ -16,7 +16,7 @@ import {
   getVerificationRequestDetails,
   fetchVerificationRequests
 } from "../thunks/adminThunks";
-import { getStatusAsNumber } from '../../utils/helpers';
+import { getStatusAsNumber, mapCampaignStatus } from '../../utils/helpers';
 
 interface AdminState extends CampaignState {
   adminDashboard: AdminDashboardData | null;
@@ -210,16 +210,34 @@ export const adminSlice = createSlice({
         state.adminError = null;
       })
       .addCase(fetchAdminDashboardData.fulfilled, (state, action) => {
-        state.adminDashboard = action.payload;
+        state.adminDashboard = {
+          ...action.payload,
+          campaignList: action.payload.campaignList.map(campaign => {
+            const statusValue = typeof campaign.status === 'bigint' ? Number(campaign.status) : 
+                              (typeof campaign.status === 'string' ? getStatusAsNumber(campaign.status) : campaign.status);
+            return {
+              ...campaign,
+              status: mapCampaignStatus(statusValue)
+            };
+          })
+        };
         state.selectedCampaignId = action.payload.selectedCampaignId;
-        state.campaignList = action.payload.campaignList.map(campaign => ({
-          ...campaign,
-          status: getStatusAsNumber(campaign.status) // Convert string status to number
-        }));
+        state.campaignList = action.payload.campaignList.map(campaign => {
+          const statusValue = typeof campaign.status === 'bigint' 
+            ? Number(campaign.status) 
+            : (typeof campaign.status === 'string' 
+                ? getStatusAsNumber(campaign.status) 
+                : campaign.status);
+          
+          return {
+            ...campaign,
+            status: statusValue
+          };
+        });
         state.verificationRequests = action.payload.verificationRequests;
         state.adminLoading = false;
         state.adminError = null;
-      })
+       })
       .addCase(fetchAdminDashboardData.rejected, (state, action) => {
         state.adminLoading = false;
         state.adminError = action.payload as string || "Failed to fetch admin dashboard data";
@@ -246,7 +264,10 @@ export const adminSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchAllCampaignIds.fulfilled, (state, action) => {
-        state.campaignList = action.payload;
+        state.campaignList = action.payload.map(campaign => ({
+          ...campaign,
+          status: typeof campaign.status === 'bigint' ? Number(campaign.status) : campaign.status
+        }));
         state.loading = false;
         state.error = null;
       })

@@ -51,13 +51,13 @@ export const useProfile = () => {
 
   // Get relevant campaigns based on user's registration window
   const relevantCampaign = campaigns
-    .filter((c) => c.isOpen || (parseInt(c.startDate) > now && parseInt(c.startDate) <= now + upcomingThreshold))
-    .sort((a, b) => parseInt(a.startDate) - parseInt(b.startDate))[0];
+    .filter((c) => c.isOpen || (c.startDate > now && c.startDate <= now + upcomingThreshold))
+    .sort((a, b) => a.startDate - b.startDate)[0];
 
   const activeCampaigns = campaigns.filter((c) => c.isOpen);
   const upcomingCampaigns = campaigns.filter((c) => 
-    parseInt(c.startDate) > now && 
-    parseInt(c.startDate) <= now + upcomingThreshold && 
+    c.startDate > now && 
+    c.startDate <= now + upcomingThreshold && 
     c.isOpen
   );
 
@@ -76,11 +76,11 @@ export const useProfile = () => {
 
   // Check if user can register for campaign based on role and timing
   const canRegisterForCampaign = (campaignId: number) => {
-    const campaign = campaigns.find(c => parseInt(c.campaignId) === campaignId);
+    const campaign = campaigns.find(c => c.id === campaignId);
     if (!campaign) return false;
 
-    const campaignStartTime = parseInt(campaign.startDate);
-    const campaignEndTime = parseInt(campaign.endDate);
+    const campaignStartTime = campaign.startDate;
+    const campaignEndTime = campaign.endDate;
     const isRegistrationPeriod = now < campaignEndTime && 
       (now <= campaignStartTime || 
        (now >= campaignStartTime && now < campaignEndTime));
@@ -105,12 +105,12 @@ export const useProfile = () => {
       try {
         const response = await fetch(`https://ipfs.io/ipfs/${campaign.detailsIpfsHash}`);
         const data = await response.json();
-        return data.name || campaign.title || `Campaign ${campaign.campaignId}`;
+        return data.name || campaign.title || `Campaign ${campaign.id}`;
       } catch (error) {
         console.error("Failed to fetch campaign name from IPFS:", error);
       }
     }
-    return campaign.title || `Campaign ${campaign.campaignId}`;
+    return campaign.title || `Campaign ${campaign.id}`;
   };
 
   // Basic Details Form
@@ -423,8 +423,8 @@ export const useProfile = () => {
 
   // Auto-register for relevant campaign (if user wants)
   const autoRegisterForRelevantCampaign = async () => {
-    if (relevantCampaign && canRegisterForCampaign(parseInt(relevantCampaign.campaignId))) {
-      await registerForCampaignById(parseInt(relevantCampaign.campaignId));
+    if (relevantCampaign && canRegisterForCampaign(relevantCampaign.id)) {
+      await registerForCampaignById(relevantCampaign.id);
     }
   };
 
@@ -438,15 +438,15 @@ export const useProfile = () => {
     };
 
     campaigns.forEach(campaign => {
-      // const isRegistered = isUserRegisteredForCampaign(parseInt(campaign.campaignId));
-      const canRegister = canRegisterForCampaign(parseInt(campaign.campaignId));
+      // const isRegistered = isUserRegisteredForCampaign(parseInt(campaign.id));
+      const canRegister = canRegisterForCampaign(campaign.id);
 
       // if (isRegistered) {
-      //   status.registeredCampaigns.push(parseInt(campaign.campaignId));
+      //   status.registeredCampaigns.push(parseInt(campaign.id));
       // }
 
       if (canRegister) {
-        status.availableCampaigns.push(parseInt(campaign.campaignId));
+        status.availableCampaigns.push(campaign.id);
       }
     });
 

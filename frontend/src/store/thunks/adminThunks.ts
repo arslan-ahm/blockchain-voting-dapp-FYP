@@ -141,27 +141,28 @@ const getMostRelevantCampaign = async (
   }
 };
 
+
+// Method 1: Type assertion approach
 export const fetchAdminDashboardData = createAsyncThunk(
   "admin/fetchDashboardData",
   async (
     {
       campaignId,
       signer,
-      provider,
       forceRefresh = false,
     }: {
       campaignId?: number;
       signer: ethers.Signer;
-      provider: ethers.Provider;
       forceRefresh?: boolean;
     },
     { rejectWithValue }
   ) => {
     try {
+      // Create contract instance with signer
       const contract = new ethers.Contract(
         VOTING_CONTRACT_ADDRESS,
         VOTING_CONTRACT_ABI,
-        provider
+        signer
       );
 
       // Validate contract deployment and ABI
@@ -187,9 +188,7 @@ export const fetchAdminDashboardData = createAsyncThunk(
 
       // Verify campaign exists and is not deleted
       try {
-        const campaignInfo = await contract.getCampaignDetails.staticCall(
-          targetCampaignId
-        );
+        const campaignInfo = await contract.getCampaignDetails(targetCampaignId);
         if (campaignInfo.isDeleted) {
           throw new Error("Campaign has been deleted");
         }
@@ -205,7 +204,7 @@ export const fetchAdminDashboardData = createAsyncThunk(
       }
 
       // Get campaign details
-      const campaignDetails = (await contract.getCampaignDetails.staticCall(
+      const campaignDetails = (await contract.getCampaignDetails(
         targetCampaignId
       )) as CampaignDetailsResponse;
 
@@ -310,17 +309,25 @@ export const fetchAdminDashboardData = createAsyncThunk(
 
       // Get verification requests if admin
       const verificationRequests: VerificationRequestData[] = [];
-      if (signer) {
-        try {
-          const signerAddress = await signer.getAddress();
-          const contractAdmin = await contract.admin();
+      
+      try {
+        const signerAddress = await signer.getAddress();
+        const contractAdmin = await contract.admin();
+        console.log("Signer Address: ", signerAddress);
+        console.log("Contract Admin Address: ", contractAdmin);
+        
+        // Case-insensitive comparison
+        if (signerAddress.toLowerCase() === contractAdmin.toLowerCase()) {
+          console.log("Admin verification passed");
+          
+          // Type assertion approach - cast contract to any to bypass TypeScript checking
+          const contractAny = contract as any;
+          
+          try {
+            const requestsData = await contractAny.getPendingVerificationRequests();
+            console.log("Verification requests data:", requestsData);
 
-          if (signerAddress.toLowerCase() === contractAdmin.toLowerCase()) {
-            // Use direct call without TypeScript checking
-            const requestsData =
-              await contract.getPendingVerificationRequests.staticCall();
-
-            if (requestsData && requestsData.length >= 6) {
+            if (requestsData && Array.isArray(requestsData) && requestsData.length >= 6) {
               const [
                 userAddresses,
                 requestedRoles,
@@ -329,8 +336,11 @@ export const fetchAdminDashboardData = createAsyncThunk(
                 userNames,
                 timestamps,
               ] = requestsData;
-
+              
+              console.log("Processing verification requests:", userAddresses.length);
+              
               for (let i = 0; i < userAddresses.length; i++) {
+                console.log(`Processing request ${i}:`, userNames[i]);
                 verificationRequests.push({
                   userAddress: userAddresses[i],
                   requestedRole: Number(requestedRoles[i]),
@@ -352,11 +362,53 @@ export const fetchAdminDashboardData = createAsyncThunk(
                   },
                 });
               }
+            } else {
+              console.log("No verification requests found or invalid response format");
+            }
+          } catch (functionError) {
+            console.error("Error calling getPendingVerificationRequests:", functionError);
+            
+            // Fallback: Try using getVerificationRequestsForDashboard instead
+            try {
+              const dashboardData = await contractAny.getVerificationRequestsForDashboard();
+              console.log("Dashboard verification data:", dashboardData);
+              
+              if (dashboardData && dashboardData.length >= 4) {
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const [pendingCount, recentRequests, recentNames, recentRoles] = dashboardData;
+                
+                for (let i = 0; i < recentRequests.length; i++) {
+                  verificationRequests.push({
+                    userAddress: recentRequests[i],
+                    requestedRole: Number(recentRoles[i]),
+                    verificationDocIpfsHash: "",
+                    adminFeedback: "",
+                    userName: recentNames[i],
+                    timestamp: Date.now(),
+                    requestTimestamp: Date.now(),
+                    status: RequestStatus.Pending,
+                    userInfo: {
+                      name: recentNames[i] || "",
+                      email: "",
+                      dateOfBirth: 0,
+                      identityNumber: "",
+                      contactNumber: "",
+                      bio: "",
+                      profileImageIpfsHash: "",
+                      supportiveLinks: [],
+                    },
+                  });
+                }
+              }
+            } catch (fallbackError) {
+              console.error("Fallback method also failed:", fallbackError);
             }
           }
-        } catch (error) {
-          console.error("Error fetching verification requests:", error);
+        } else {
+          console.log("User is not admin, skipping verification requests");
         }
+      } catch (error) {
+        console.error("Error in admin verification or fetching requests:", error);
       }
 
       // Get campaign statistics
@@ -367,7 +419,7 @@ export const fetchAdminDashboardData = createAsyncThunk(
 
       for (let i = 1; i <= totalCampaigns; i++) {
         try {
-          const details = await contract.getCampaignDetails.staticCall(i);
+          const details = await contract.getCampaignDetails(i);
           if (details.isDeleted) continue;
 
           const start = Number(details.startDate);
@@ -397,7 +449,10 @@ export const fetchAdminDashboardData = createAsyncThunk(
         voters,
         verificationRequests,
         totalCampaigns,
-        campaignList,
+        campaignList: campaignList.map(campaign => ({
+          ...campaign,
+          status: typeof campaign.status === 'bigint' ? Number(campaign.status) : campaign.status
+        })),
         activeCampaigns,
         selectedCampaignId: targetCampaignId,
         completedCampaigns,
@@ -425,7 +480,7 @@ export const selectCampaign = createAsyncThunk(
     }
 
     // Fetch dashboard data for the selected campaign
-    await dispatch(fetchAdminDashboardData({ campaignId, signer, provider }));
+    await dispatch(fetchAdminDashboardData({ campaignId, signer }));
     return campaignId;
   }
 );
@@ -482,7 +537,6 @@ export async function validateCampaignSwitch(
 
   return true;
 }
-
 export const fetchAllCampaignIds = createAsyncThunk(
   "admin/fetchAllCampaignIds",
   async ({ provider }: { provider: ethers.Provider }, { rejectWithValue }) => {
@@ -492,16 +546,16 @@ export const fetchAllCampaignIds = createAsyncThunk(
         VOTING_CONTRACT_ABI,
         provider
       );
-
+ 
       const isValidContract = await validateContract(contract);
       if (!isValidContract) {
         return rejectWithValue("Contract not found or invalid");
       }
-
+ 
       const nextId = await contract.nextCampaignId.staticCall();
       const totalCampaigns = Number(nextId) - 1;
       const campaigns = [];
-
+ 
       for (let i = 1; i <= totalCampaigns; i++) {
         const details = await contract.getCampaignDetails.staticCall(i);
         if (!details.isDeleted) {
@@ -509,18 +563,18 @@ export const fetchAllCampaignIds = createAsyncThunk(
             id: i,
             title: details.title,
             description: details.description,
-            status: details.status,
+            status: typeof details.status === 'bigint' ? Number(details.status) : details.status,
           });
         }
       }
-
+ 
       return campaigns;
     } catch (error) {
       console.error("Failed to fetch campaign IDs:", error);
       return rejectWithValue(handleContractError(error));
     }
   }
-);
+ );
 
 export const adminCreateCampaign = createAsyncThunk(
   "admin/createCampaign",

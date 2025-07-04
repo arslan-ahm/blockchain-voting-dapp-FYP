@@ -125,7 +125,7 @@ export const useAdminDashboard = () => {
   useEffect(() => {
     if (selectedCampaign !== null && signer && provider) {
       setIsLoadingCampaignData(true);
-      dispatch(fetchAdminDashboardData({ campaignId: selectedCampaign, signer, provider })).finally(() => {
+      dispatch(fetchAdminDashboardData({ campaignId: selectedCampaign, signer })).finally(() => {
         setIsLoadingCampaignData(false);
       });
     }

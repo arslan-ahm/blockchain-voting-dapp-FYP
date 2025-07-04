@@ -21,7 +21,7 @@ interface Campaign {
   candidates: string[];
 }
 
-interface UserState {
+export interface UserState {
   account: string | null;
   details: UserDetails | null;
   role: Role;
