@@ -375,7 +375,7 @@ export const fetchAdminDashboardData = createAsyncThunk(
               
               if (dashboardData && dashboardData.length >= 4) {
                 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-                const [pendingCount, recentRequests, recentNames, recentRoles] = dashboardData;
+                const [recentRequests, recentNames, recentRoles] = dashboardData;
                 
                 for (let i = 0; i < recentRequests.length; i++) {
                   verificationRequests.push({

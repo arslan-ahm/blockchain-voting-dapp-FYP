@@ -256,6 +256,21 @@ export interface CampaignState {
   hasActiveCampaign: boolean;
   userVotes: UserVote[]
   activeCampaignId: string;
+  campaignParticipants: Record<number, {
+    candidates: Array<{
+      address: string;
+      name: string;
+      votes: string;
+      type: string;
+    }>;
+    voters: Array<{
+      address: string;
+      name: string;
+      hasVoted: boolean;
+      type: string;
+    }>;
+  }>;
+  fetchingParticipants: boolean;
   transactionHash: string | null;
   upkeepNeeded: boolean;
   performData: string | null;

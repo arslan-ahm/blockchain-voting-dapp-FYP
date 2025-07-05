@@ -2,7 +2,18 @@ import { CampaignStatus, Role } from "../types";
 
 export const mapCampaignStatus = (status: number | string): CampaignStatus => {
   if (typeof status === "string") {
-    return status as CampaignStatus;
+    switch (status) {
+      case 'upcoming':
+        return "Upcoming";
+      case 'active':
+        return "Active";
+      case 'completed':
+        return "Completed";
+      case 'deleted':
+        return "Deleted";
+      default:
+        return "Upcoming";
+    }
   }
 
   switch (status) {

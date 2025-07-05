@@ -17,18 +17,16 @@ import {
   performUpkeep,
   getCampaignStats,
   getCampaignVoters,
-  getMonthlyCampaigns
+  getMonthlyCampaigns,
+  getCampaignParticipants,
+  getCampaignWithParticipants
 } from "../thunks/campaignThunks";
 import type {
-  CampaignDetails,
-  CandidateVote,
-  UserRegistration,
-  UserVote,
-  VoterDetail,
-  CampaignStats,
-  MonthlyCampaign,
-  CampaignState
+  Campaign,
+  CampaignState,
+  CampaignStatus
 } from "../../types";
+import { mapCampaignStatus } from "../../utils/helpers";
 
 
 const initialState: CampaignState = {
@@ -38,7 +36,7 @@ const initialState: CampaignState = {
   campaigns: [],
   nearbyCampaigns: [],
   activeCampaign: null,
-  
+  currentCampaign: null,
   voteStatus: "idle",
   registrationStatus: "idle",
   
@@ -48,7 +46,9 @@ const initialState: CampaignState = {
   campaignVoters: {},
   campaignStats: {},
   monthlyCampaigns: {},
+  campaignParticipants: {}, // Add this line
   
+  fetchingParticipants: false,
   hasActiveCampaign: false,
   activeCampaignId: "0",
   transactionHash: null,
@@ -109,7 +109,7 @@ const campaignSlice = createSlice({
         state.fetchingCampaigns = false;
         state.campaigns = action.payload.map(campaign => ({
           ...campaign,
-          campaignId: campaign.campaignId.toString()
+          campaignId: campaign.id.toString()
         }));
       })
       .addCase(fetchCampaigns.rejected, (state, action) => {
@@ -129,6 +129,57 @@ const campaignSlice = createSlice({
         state.fetchingNearbyCampaigns = false;
         state.error = action.error.message || "Failed to fetch nearby campaigns";
       })
+
+      .addCase(getCampaignParticipants.pending, (state) => {
+        state.fetchingParticipants = true;
+        state.error = null;
+      })
+      .addCase(getCampaignParticipants.fulfilled, (state, action) => {
+        state.fetchingParticipants = false;
+        const { campaignId, candidates, voters } = action.payload;
+        state.campaignParticipants[campaignId] = { candidates, voters };
+      })
+      .addCase(getCampaignParticipants.rejected, (state, action) => {
+        state.fetchingParticipants = false;
+        state.error = action.error.message || "Failed to fetch campaign participants";
+      })
+      
+      .addCase(getCampaignWithParticipants.pending, (state) => {
+        state.fetchingCampaigns = true;
+        state.fetchingParticipants = true;
+        state.error = null;
+      })
+      .addCase(getCampaignWithParticipants.fulfilled, (state, action) => {
+        state.fetchingCampaigns = false;
+        state.fetchingParticipants = false;
+        const { id, candidates, voters, ...campaignDetails } = action.payload;
+        
+        // Update or add campaign details
+        const existingIndex = state.campaigns.findIndex(
+          c => c.id === id
+        );
+        
+        if (existingIndex >= 0) {
+          state.campaigns[existingIndex] = {
+            ...state.campaigns[existingIndex],
+            ...campaignDetails,
+            id: id
+          };
+        } else {
+          state.campaigns.push({
+            ...campaignDetails,
+            id: id
+          });
+        }
+        
+        // Update participants
+        state.campaignParticipants[id] = { candidates, voters };
+      })
+      .addCase(getCampaignWithParticipants.rejected, (state, action) => {
+        state.fetchingCampaigns = false;
+        state.fetchingParticipants = false;
+        state.error = action.error.message || "Failed to fetch campaign with participants";
+      })
       
       .addCase(createCampaign.pending, (state) => {
         state.creatingCampaign = true;
@@ -139,8 +190,8 @@ const campaignSlice = createSlice({
         state.transactionHash = action.payload.transactionHash;
         
         if (action.payload.campaignId) {
-          const newCampaign: CampaignDetails = {
-            campaignId: action.payload.campaignId,
+          const newCampaign: Campaign = {  // Change from CampaignDetails to Campaign
+            id: action.payload.campaignId,
             startDate: action.payload.startDate,
             endDate: action.payload.endDate,
             title: action.payload.title,
@@ -149,10 +200,10 @@ const campaignSlice = createSlice({
             winner: "",
             isOpen: true,
             isDeleted: false,
-            totalVotes: "0",
-            voterCount: "0",
-            candidateCount: "0",
-            status: 0
+            totalVotes: 0,
+            voterCount: 0,
+            candidateCount: 0,
+            status: "Active" as CampaignStatus
           };
           state.campaigns.push(newCampaign);
         }
@@ -171,7 +222,7 @@ const campaignSlice = createSlice({
         state.transactionHash = action.payload.transactionHash;
         
         const campaignIndex = state.campaigns.findIndex(
-          c => c.campaignId === action.payload.campaignId.toString()
+          c => c.id === action.payload.campaignId
         );
         if (campaignIndex >= 0) {
           state.campaigns[campaignIndex].isDeleted = true;
@@ -197,7 +248,7 @@ const campaignSlice = createSlice({
       
       .addCase(hasActiveCampaign.fulfilled, (state, action) => {
         state.hasActiveCampaign = action.payload.hasActiveCampaign;
-        state.activeCampaignId = action.payload.activeCampaignId;
+        state.activeCampaignId = action.payload.activeCampaignId.toString();
       })
       .addCase(hasActiveCampaign.rejected, (state, action) => {
         state.error = action.error.message || "Failed to check active campaign";
@@ -336,11 +387,11 @@ const campaignSlice = createSlice({
         state.transactionHash = action.payload.transactionHash;
         
         const campaignIndex = state.campaigns.findIndex(
-          c => c.campaignId === action.payload.campaignId.toString()
+          c => c.id === action.payload.campaignId
         );
         if (campaignIndex >= 0) {
           state.campaigns[campaignIndex].isOpen = false;
-          state.campaigns[campaignIndex].status = 2;
+          state.campaigns[campaignIndex].status = mapCampaignStatus(2);
         }
       })
       .addCase(manualCloseCampaign.rejected, (state, action) => {

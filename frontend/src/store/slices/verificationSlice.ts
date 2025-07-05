@@ -1,13 +1,13 @@
 import { createSlice } from "@reduxjs/toolkit";
 import type { VerificationRequest, UserDetails, Role } from "../../types";
-import { 
-  fetchVerificationRequests, 
-  processVerification, 
+import {
+  fetchVerificationRequests,
+  processVerification,
   requestVerification,
   updateUserDetails,
   checkUserDetailsLocked,
   fetchUserDetails,
-  fetchUserRole
+  fetchUserRole,
 } from "../thunks/verificationThunks";
 
 interface VerificationState {
@@ -40,7 +40,7 @@ const verificationSlice = createSlice({
     resetVerificationStatus: (state) => {
       state.status = "idle";
       state.updateDetailsStatus = "idle";
-    }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -55,9 +55,10 @@ const verificationSlice = createSlice({
       })
       .addCase(fetchVerificationRequests.rejected, (state, action) => {
         state.status = "rejected";
-        state.error = action.error.message || "Failed to fetch verification requests";
+        state.error =
+          action.error.message || "Failed to fetch verification requests";
       })
-      
+
       // Request verification
       .addCase(requestVerification.pending, (state) => {
         state.status = "pending";
@@ -70,21 +71,24 @@ const verificationSlice = createSlice({
         state.status = "rejected";
         state.error = action.error.message || "Failed to request verification";
       })
-      
+
       // Process verification
       .addCase(processVerification.pending, (state) => {
         state.status = "pending";
         state.error = null;
       })
       .addCase(processVerification.fulfilled, (state, action) => {
-        state.requests = state.requests.filter((r) => r.userAddress !== action.payload.userAddress);
+        state.requests = state.requests.filter(
+          (r: { userAddress: string }) =>
+            r.userAddress !== action.payload.userAddress
+        );
         state.status = "fulfilled";
       })
       .addCase(processVerification.rejected, (state, action) => {
         state.status = "rejected";
         state.error = action.error.message || "Failed to process verification";
       })
-      
+
       // Update user details
       .addCase(updateUserDetails.pending, (state) => {
         state.updateDetailsStatus = "pending";
@@ -96,7 +100,7 @@ const verificationSlice = createSlice({
         if (state.userDetails) {
           state.userDetails = {
             ...state.userDetails,
-            ...action.payload
+            ...action.payload,
           };
         }
       })
@@ -104,7 +108,7 @@ const verificationSlice = createSlice({
         state.updateDetailsStatus = "rejected";
         state.error = action.error.message || "Failed to update user details";
       })
-      
+
       // Check user details locked status
       .addCase(checkUserDetailsLocked.fulfilled, (state, action) => {
         state.isUserDetailsLocked = action.payload.isLocked;
@@ -112,7 +116,7 @@ const verificationSlice = createSlice({
       .addCase(checkUserDetailsLocked.rejected, (state, action) => {
         state.error = action.error.message || "Failed to check lock status";
       })
-      
+
       // Fetch user details
       .addCase(fetchUserDetails.pending, (state) => {
         state.status = "pending";
@@ -127,7 +131,7 @@ const verificationSlice = createSlice({
           contactNumber: action.payload.contactNumber,
           bio: action.payload.bio,
           profileImageIpfsHash: action.payload.profileImageIpfsHash,
-          supportiveLinks: action.payload.supportiveLinks
+          supportiveLinks: action.payload.supportiveLinks,
         };
         state.status = "fulfilled";
       })
@@ -135,7 +139,7 @@ const verificationSlice = createSlice({
         state.status = "rejected";
         state.error = action.error.message || "Failed to fetch user details";
       })
-      
+
       // Fetch user role
       .addCase(fetchUserRole.fulfilled, (state, action) => {
         state.userRole = action.payload.role;
@@ -146,5 +150,6 @@ const verificationSlice = createSlice({
   },
 });
 
-export const { clearVerificationError, resetVerificationStatus } = verificationSlice.actions;
+export const { clearVerificationError, resetVerificationStatus } =
+  verificationSlice.actions;
 export default verificationSlice.reducer;

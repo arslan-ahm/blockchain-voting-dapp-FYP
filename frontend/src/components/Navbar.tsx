@@ -214,7 +214,7 @@ export const Navbar = () => {
                 <Button 
                   onClick={handleLogout} 
                   variant="ghost" 
-                  className="text-gray-200 hover:text-red-400 hover:bg-red-500/10"
+                  className="text-red-400 bg-red-500/10 rounded-full"
                 >
                   <LogOut size={16} className="mr-2" />
                   Logout

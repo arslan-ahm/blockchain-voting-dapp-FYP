@@ -3,10 +3,10 @@ import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { 
   fetchNearbyCampaigns,
   checkUserRegistration,
-  getCampaignVoters,
   getCampaignStats,
   getAllCandidateVotes,
   registerForCampaign,
+  getCampaignParticipants,
   castVote
 } from "../../store/thunks/campaignThunks";
 import { resetVoteStatus, clearError } from "../../store/slices/campaignSlice";
@@ -38,26 +38,34 @@ export const useCampaignList = ({
     voteStatus,
     registrationStatus,
     castingVote,
-    transactionHash
+    transactionHash,
+    campaignParticipants,
+    fetchingParticipants 
   } = useAppSelector((state) => state.campaign);
 
   // Fetch nearby campaigns
   const fetchCampaigns = useCallback(() => {
+    if (!provider) return;
+    
     dispatch(fetchNearbyCampaigns());
-  }, [dispatch]);
+  }, [dispatch, provider]);
 
   // Fetch detailed data for a specific campaign
   const fetchCampaignDetails = useCallback((campaignId: number) => {
-    if (!provider) throw new Error("Provider not connected");
+    if (!provider) {
+      console.warn("Provider not connected, skipping campaign details fetch");
+      return;
+    }
     
-    dispatch(getCampaignVoters({ campaignId, provider }));
+    // dispatch(getCampaignVoters({ campaignId, provider }));
     dispatch(getCampaignStats({ campaignId, provider }));
     dispatch(getAllCandidateVotes({ campaignId, provider }));
+    dispatch(getCampaignParticipants({ campaignId, provider }));
     
     if (userAddress) {
       dispatch(checkUserRegistration({ campaignId, userAddress, provider }));
     }
-  }, [dispatch, userAddress]);
+  }, [dispatch, userAddress, provider]);
 
   // Register user for campaign
   const registerUser = useCallback(async (campaignId: number) => {
@@ -73,24 +81,54 @@ export const useCampaignList = ({
     fetchCampaignDetails(campaignId);
     
     return result;
-  }, [dispatch, userAddress, fetchCampaignDetails]);
+  }, [dispatch, userAddress, fetchCampaignDetails, signer]);
+
+  // Get candidates for a campaign
+  const getCampaignCandidates = useCallback((campaignId: number) => {
+    const participants = campaignParticipants[campaignId];
+    return participants?.candidates || [];
+  }, [campaignParticipants]);
+
+  // Get voters for a campaign
+  const getCampaignVoters = useCallback((campaignId: number) => {
+    const participants = campaignParticipants[campaignId];
+    return participants?.voters || [];
+  }, [campaignParticipants]);
 
   // Cast vote for candidate
   const voteForCandidate = useCallback(async (campaignId: number, candidateAddress: string) => {
     if (!userAddress) throw new Error("User address is required");
     if (!signer) throw new Error("Signer not connected");
     
-    const result = await dispatch(castVote({
-      campaignId,
-      candidate: candidateAddress,
-      signer
-    })).unwrap();
-    
-    // Refresh campaign data after successful vote
-    fetchCampaignDetails(campaignId);
-    
-    return result;
+    try {
+      const result = await dispatch(castVote({
+        campaignId,
+        candidate: candidateAddress,
+        signer
+      })).unwrap();
+      
+      // Refresh campaign data after successful vote
+      fetchCampaignDetails(campaignId);
+      
+      return result;
+    } catch (error) {
+      console.error('Failed to cast vote:', error);
+      throw error;
+    }
   }, [dispatch, userAddress, fetchCampaignDetails, signer]);
+  
+  // Handle vote submission
+  const handleVoteSubmission = useCallback(async (campaignId: number, candidateAddress: string) => {
+    try {
+      await voteForCandidate(campaignId, candidateAddress);
+      return { success: true, message: 'Vote cast successfully!' };
+    } catch (error) {
+      if(error instanceof Error){
+        return { success: false, message: error.message || 'Failed to cast vote' };
+      }
+      throw error;
+    }
+  }, [voteForCandidate]);
 
   // Get user registration status for a campaign
   const getUserRegistration = useCallback((campaignId: number) => {
@@ -146,12 +184,14 @@ export const useCampaignList = ({
     fetchCampaigns();
   }, [fetchCampaigns]);
 
-  // Fetch detailed data for all nearby campaigns
+  // Fetch detailed data for all nearby campaigns - FIXED: Only run when provider is available
   useEffect(() => {
+    if (!provider || nearbyCampaigns.length === 0) return;
+    
     nearbyCampaigns.forEach(campaign => {
       fetchCampaignDetails(campaign.id);
     });
-  }, [nearbyCampaigns, fetchCampaignDetails]);
+  }, [nearbyCampaigns, fetchCampaignDetails, provider]);
 
   // Auto-refresh functionality
   useEffect(() => {
@@ -177,6 +217,23 @@ export const useCampaignList = ({
     getCampaignStatus(campaign) === 'ended'
   );
 
+  // Get user's voting status for a campaign
+  const getUserVotingStatus = useCallback((campaignId: number) => {
+    const registration = getUserRegistration(campaignId);
+    const vote = getUserVote(campaignId);
+    const campaign = nearbyCampaigns.find(c => c.id === campaignId);
+    const status = campaign ? getCampaignStatus(campaign) : 'ended';
+    
+    return {
+      canVote: registration?.isVoter && !vote?.votedCandidate && status === 'active',
+      hasVoted: !!vote?.votedCandidate,
+      votedFor: vote?.votedCandidate,
+      isRegistered: !!registration,
+      isCandidate: !!registration?.isCandidate,
+      isVoter: !!registration?.isVoter
+    };
+  }, [getUserRegistration, getUserVote, nearbyCampaigns, getCampaignStatus]);
+
   return {
     // Data
     campaigns: nearbyCampaigns,
@@ -188,10 +245,12 @@ export const useCampaignList = ({
     candidateVotes,
     userRegistrations,
     userVotes,
+    campaignParticipants,
     
     // Loading states
     loading: fetchingNearbyCampaigns,
     castingVote,
+    fetchingParticipants,
     
     // Status
     voteStatus,
@@ -211,6 +270,10 @@ export const useCampaignList = ({
     getUserRegistration,
     getUserVote,
     canUserVote,
-    getCampaignStatus
+    getCampaignStatus,
+    getCampaignCandidates,
+    getCampaignVoters,
+    getUserVotingStatus,
+    handleVoteSubmission
   };
 };

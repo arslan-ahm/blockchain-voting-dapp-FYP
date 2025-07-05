@@ -1,10 +1,16 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Bold, 
-  Italic, 
-  Underline, 
-  List, 
-  ListOrdered, 
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  type RefObject,
+} from "react";
+import {
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -12,11 +18,12 @@ import {
   ChevronDown,
   Undo,
   Redo,
-  Strikethrough
-} from 'lucide-react';
+  Strikethrough,
+} from "lucide-react";
 
 // Utility function for className merging
-const cn = (...classes: (string | boolean | undefined)[]): string => classes.filter(Boolean).join(' ');
+const cn = (...classes: (string | boolean | undefined)[]): string =>
+  classes.filter(Boolean).join(" ");
 
 // ImageUpload Component
 interface ImageUploadProps {
@@ -25,7 +32,11 @@ interface ImageUploadProps {
   className?: string;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({
+  onChange,
+  preview,
+  className,
+}) => {
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
 
@@ -45,7 +56,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
       e.stopPropagation();
       setDragActive(false);
       const file = e.dataTransfer.files?.[0];
-      if (file && (file.type.startsWith("image/") || file.type === "application/pdf")) {
+      if (
+        file &&
+        (file.type.startsWith("image/") || file.type === "application/pdf")
+      ) {
         onChange(file);
         if (file.type.startsWith("image/")) {
           setLocalPreview(URL.createObjectURL(file));
@@ -78,7 +92,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
     <div
       className={cn(
         "relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors",
-        dragActive ? "border-blue-400 bg-blue-400/10" : "border-gray-600 bg-gray-700",
+        dragActive
+          ? "border-blue-400 bg-blue-400/10"
+          : "border-gray-600 bg-gray-700",
         className
       )}
       onDragEnter={handleDrag}
@@ -87,11 +103,17 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
       onDrop={handleDrop}
     >
       {displayPreview ? (
-        <img src={displayPreview} alt="Preview" className="h-32 w-32 object-cover rounded-lg mb-4" />
+        <img
+          src={displayPreview}
+          alt="Preview"
+          className="h-32 w-32 object-cover rounded-lg mb-4"
+        />
       ) : (
         <Upload className="h-12 w-12 text-gray-400 mb-4" />
       )}
-      <p className="text-gray-200 text-sm mb-2">Drag and drop an image or PDF, or click to select</p>
+      <p className="text-gray-200 text-sm mb-2">
+        Drag and drop an image or PDF, or click to select
+      </p>
       <input
         type="file"
         accept="image/*,application/pdf"
@@ -104,14 +126,22 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
 
 // Floating Menu Component
 interface FloatingMenuProps {
-  anchorRef: React.RefObject<HTMLElement>;
+  anchorRef: RefObject<HTMLElement> | RefObject<HTMLButtonElement>;
   isOpen: boolean;
   onClose: () => void;
   children: React.ReactNode;
 }
 
-const FloatingMenu: React.FC<FloatingMenuProps> = ({ anchorRef, isOpen, onClose, children }) => {
-  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+const FloatingMenu: React.FC<FloatingMenuProps> = ({
+  anchorRef,
+  isOpen,
+  onClose,
+  children,
+}) => {
+  const [position, setPosition] = useState<{ top: number; left: number }>({
+    top: 0,
+    left: 0,
+  });
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -119,7 +149,7 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({ anchorRef, isOpen, onClose,
       const rect = anchorRef.current.getBoundingClientRect();
       setPosition({
         top: rect.bottom + 8,
-        left: rect.left
+        left: rect.left,
       });
     }
   }, [isOpen, anchorRef]);
@@ -137,11 +167,11 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({ anchorRef, isOpen, onClose,
     };
 
     if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener("mousedown", handleClickOutside);
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener("mousedown", handleClickOutside);
     };
   }, [isOpen, onClose, anchorRef]);
 
@@ -153,7 +183,7 @@ const FloatingMenu: React.FC<FloatingMenuProps> = ({ anchorRef, isOpen, onClose,
       className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-4 min-w-80"
       style={{
         top: position.top,
-        left: position.left
+        left: position.left,
       }}
     >
       {children}
@@ -170,19 +200,19 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ 
-  value = '', 
-  onChange, 
-  onUpload, 
+const RichTextEditor: React.FC<RichTextEditorProps> = ({
+  value = "",
+  onChange,
+  onUpload,
   isUploading = false,
-  placeholder = "Start writing..." 
+  placeholder = "Start writing...",
 }) => {
   const [content, setContent] = useState<string>(value);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const [undoStack, setUndoStack] = useState<string[]>([]);
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [currentSelection, setCurrentSelection] = useState<Range | null>(null);
-  
+
   const editorRef = useRef<HTMLDivElement>(null);
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -225,13 +255,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleContentChange = useCallback((): void => {
     if (editorRef.current) {
       const newContent = editorRef.current.innerHTML;
-      
+
       // Add to undo stack
       if (content !== newContent) {
-        setUndoStack(prev => [...prev.slice(-19), content]); // Keep last 20 states
+        setUndoStack((prev) => [...prev.slice(-19), content]); // Keep last 20 states
         setRedoStack([]); // Clear redo stack on new change
       }
-      
+
       setContent(newContent);
       onChange?.(newContent);
     }
@@ -241,8 +271,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleUndo = (): void => {
     if (undoStack.length > 0) {
       const previousState = undoStack[undoStack.length - 1];
-      setRedoStack(prev => [content, ...prev]);
-      setUndoStack(prev => prev.slice(0, -1));
+      setRedoStack((prev) => [content, ...prev]);
+      setUndoStack((prev) => prev.slice(0, -1));
       setContent(previousState);
       if (editorRef.current) {
         editorRef.current.innerHTML = previousState;
@@ -255,8 +285,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleRedo = (): void => {
     if (redoStack.length > 0) {
       const nextState = redoStack[0];
-      setUndoStack(prev => [...prev, content]);
-      setRedoStack(prev => prev.slice(1));
+      setUndoStack((prev) => [...prev, content]);
+      setRedoStack((prev) => prev.slice(1));
       setContent(nextState);
       if (editorRef.current) {
         editorRef.current.innerHTML = nextState;
@@ -269,7 +299,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     if (e.ctrlKey || e.metaKey) {
       switch (e.key) {
-        case 'z':
+        case "z":
           e.preventDefault();
           if (e.shiftKey) {
             handleRedo();
@@ -277,21 +307,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             handleUndo();
           }
           break;
-        case 'y':
+        case "y":
           e.preventDefault();
           handleRedo();
           break;
-        case 'b':
+        case "b":
           e.preventDefault();
-          execCommand('bold');
+          execCommand("bold");
           break;
-        case 'i':
+        case "i":
           e.preventDefault();
-          execCommand('italic');
+          execCommand("italic");
           break;
-        case 'u':
+        case "u":
           e.preventDefault();
-          execCommand('underline');
+          execCommand("underline");
           break;
       }
     }
@@ -306,17 +336,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   };
 
   // Custom heading sizes
-  const headingSizes: { [key: string]: { tag: string; size: string; weight: string } } = {
-    'H1': { tag: 'h1', size: '2.5rem', weight: 'bold' },
-    'H2': { tag: 'h2', size: '2rem', weight: 'bold' },
-    'H3': { tag: 'h3', size: '1.5rem', weight: 'bold' },
-    'H4': { tag: 'h4', size: '1.25rem', weight: 'bold' },
-    'H5': { tag: 'h5', size: '1.125rem', weight: 'bold' },
-    'H6': { tag: 'h6', size: '1rem', weight: 'bold' }
+  const headingSizes: {
+    [key: string]: { tag: string; size: string; weight: string };
+  } = {
+    H1: { tag: "h1", size: "2.5rem", weight: "bold" },
+    H2: { tag: "h2", size: "2rem", weight: "bold" },
+    H3: { tag: "h3", size: "1.5rem", weight: "bold" },
+    H4: { tag: "h4", size: "1.25rem", weight: "bold" },
+    H5: { tag: "h5", size: "1.125rem", weight: "bold" },
+    H6: { tag: "h6", size: "1rem", weight: "bold" },
   };
 
   const applyHeading = (tag: string): void => {
-    execCommand('formatBlock', tag);
+    execCommand("formatBlock", tag);
     // Apply custom styling
     setTimeout(() => {
       const selection = window.getSelection();
@@ -326,7 +358,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           const style = headingSizes[tag.toUpperCase()];
           element.style.fontSize = style.size;
           element.style.fontWeight = style.weight;
-          element.style.marginBottom = '0.5rem';
+          element.style.marginBottom = "0.5rem";
         }
       }
     }, 0);
@@ -360,8 +392,8 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           {/* Format Dropdown */}
           <select
             onChange={(e) => {
-              if (e.target.value === 'p') {
-                execCommand('formatBlock', 'p');
+              if (e.target.value === "p") {
+                execCommand("formatBlock", "p");
               } else {
                 applyHeading(e.target.value);
               }
@@ -382,28 +414,28 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Text Formatting */}
           <button
-            onClick={() => execCommand('bold')}
+            onClick={() => execCommand("bold")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Bold (Ctrl+B)"
           >
             <Bold className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('italic')}
+            onClick={() => execCommand("italic")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Italic (Ctrl+I)"
           >
             <Italic className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('underline')}
+            onClick={() => execCommand("underline")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Underline (Ctrl+U)"
           >
             <Underline className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('strikeThrough')}
+            onClick={() => execCommand("strikeThrough")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Strikethrough"
           >
@@ -414,21 +446,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Alignment */}
           <button
-            onClick={() => execCommand('justifyLeft')}
+            onClick={() => execCommand("justifyLeft")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Align Left"
           >
             <AlignLeft className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('justifyCenter')}
+            onClick={() => execCommand("justifyCenter")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Align Center"
           >
             <AlignCenter className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('justifyRight')}
+            onClick={() => execCommand("justifyRight")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Align Right"
           >
@@ -439,14 +471,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Lists */}
           <button
-            onClick={() => execCommand('insertUnorderedList')}
+            onClick={() => execCommand("insertUnorderedList")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Bullet List"
           >
             <List className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('insertOrderedList')}
+            onClick={() => execCommand("insertOrderedList")}
             className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
             title="Numbered List"
           >
@@ -463,12 +495,12 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               className={cn(
                 "flex items-center gap-2 px-4 py-2 font-medium transition-colors rounded-l",
                 isUploading || !content.trim()
-                  ? 'bg-gray-600 cursor-not-allowed text-gray-400'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  ? "bg-gray-600 cursor-not-allowed text-gray-400"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
               )}
             >
               <Upload className="w-4 h-4" />
-              {isUploading ? 'Uploading...' : 'Upload'}
+              {isUploading ? "Uploading..." : "Upload"}
             </button>
             <button
               ref={uploadButtonRef}
@@ -494,31 +526,34 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onKeyUp={saveSelection}
         className="min-h-96 p-4 text-white focus:outline-none"
         style={{
-          lineHeight: '1.6',
+          lineHeight: "1.6",
         }}
         suppressContentEditableWarning={true}
-        {...(placeholder && { 'data-placeholder': placeholder })}
+        {...(placeholder && { "data-placeholder": placeholder })}
       />
 
       {/* Floating Upload Menu */}
-      <FloatingMenu
-        anchorRef={uploadButtonRef}
-        isOpen={isMenuOpen}
-        onClose={() => setIsMenuOpen(false)}
-      >
-        <div className="space-y-3">
-          <h3 className="text-white font-medium">Upload Document</h3>
-          <ImageUpload
-            onChange={handleFileUpload}
-            className="w-full"
-          />
-        </div>
-      </FloatingMenu>
+        <FloatingMenu
+          anchorRef={uploadButtonRef}
+          isOpen={isMenuOpen}
+          onClose={() => setIsMenuOpen(false)}
+        >
+          <div className="space-y-3">
+            <h3 className="text-white font-medium">Upload Document</h3>
+            <ImageUpload onChange={handleFileUpload} className="w-full" />
+          </div>
+        </FloatingMenu>
 
       {/* Help Text */}
       <div className="border-t border-gray-600 p-3 text-sm text-gray-400">
-        <p><strong>Shortcuts:</strong> Ctrl+Z (Undo), Ctrl+Y (Redo), Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline)</p>
-        <p><strong>Placeholders:</strong> Use [START_DATE] and [END_DATE] for automatic date replacement</p>
+        <p>
+          <strong>Shortcuts:</strong> Ctrl+Z (Undo), Ctrl+Y (Redo), Ctrl+B
+          (Bold), Ctrl+I (Italic), Ctrl+U (Underline)
+        </p>
+        <p>
+          <strong>Placeholders:</strong> Use [START_DATE] and [END_DATE] for
+          automatic date replacement
+        </p>
       </div>
     </div>
   );
