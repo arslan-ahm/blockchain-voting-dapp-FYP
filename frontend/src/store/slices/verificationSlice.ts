@@ -1,5 +1,5 @@
 import { createSlice } from "@reduxjs/toolkit";
-import type { VerificationRequest, UserDetails, Role } from "../../types";
+import type {  UserDetails, Role, VerificationRequestData } from "../../types";
 import {
   fetchVerificationRequests,
   processVerification,
@@ -11,7 +11,7 @@ import {
 } from "../thunks/verificationThunks";
 
 interface VerificationState {
-  requests: VerificationRequest[];
+  requests: VerificationRequestData[];
   status: "idle" | "pending" | "fulfilled" | "rejected";
   error: string | null;
   userDetails: UserDetails | null;
@@ -50,7 +50,7 @@ const verificationSlice = createSlice({
         state.error = null;
       })
       .addCase(fetchVerificationRequests.fulfilled, (state, action) => {
-        state.requests = action.payload as unknown as VerificationRequest[];
+        state.requests = action.payload as unknown as VerificationRequestData[];
         state.status = "fulfilled";
       })
       .addCase(fetchVerificationRequests.rejected, (state, action) => {

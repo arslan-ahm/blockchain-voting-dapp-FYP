@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { Loader2, Wallet, MoreVertical, Eye, X, Trash2 } from "lucide-react";
+import { Loader2, Wallet, MoreVertical, Eye, X, Trash2, Newspaper } from "lucide-react";
 import { useRef, useState } from "react";
 
 // Hooks
@@ -407,7 +407,7 @@ const AdminDashboard = () => {
       ) : (
         <div className="flex justify-center items-center h-64">
           <EmptyState
-            icon={Loader2}
+            icon={Newspaper}
             title="No Campaigns Found"
             description="Create your first campaign to get started."
           />

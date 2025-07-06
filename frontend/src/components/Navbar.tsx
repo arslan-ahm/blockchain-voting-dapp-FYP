@@ -1,24 +1,34 @@
 // src/components/Navbar.tsx
-import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { WalletConnect } from './WalletConnect';
-import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
-import { Button } from './ui/button';
-import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from './ui/dropdown-menu';
-import { getIpfsUrl } from '../utils/ipfs';
-import { formatAddress } from '../utils/formatters';
-import { LogOut, Menu, User, X, Vote } from 'lucide-react';
-import { useAppSelector, useAppDispatch } from '../hooks/useRedux';
-import { clearUser } from '../store/slices/userSlice';
-import { fetchUserDetails } from '../store/thunks/userThunks';
-import { toast } from 'sonner';
-import { useWallet } from '../hooks/useWallet';
-import { Role } from '../types';
-import { cn } from '../utils/cn';
-import { LANDING_PAGE_SECTIONS } from '../constants/navigation';
-
-
+import { useState, useEffect } from "react";
+import { Link, useNavigate, useLocation } from "react-router-dom";
+import { WalletConnect } from "./WalletConnect";
+import { Avatar, AvatarImage, AvatarFallback } from "./ui/avatar";
+import { Button } from "./ui/button";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "./ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+import { getIpfsUrl } from "../utils/ipfs";
+import { formatAddress } from "../utils/formatters";
+import { LogOut, Menu, User, X, Vote } from "lucide-react";
+import { useAppSelector, useAppDispatch } from "../hooks/useRedux";
+import { clearUser } from "../store/slices/userSlice";
+import { fetchUserDetails } from "../store/thunks/userThunks";
+import { toast } from "sonner";
+import { useWallet } from "../hooks/useWallet";
+import { Role } from "../types";
+import { cn } from "../utils/cn";
+import { LANDING_PAGE_SECTIONS } from "../constants/navigation";
 
 export const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -28,35 +38,35 @@ export const Navbar = () => {
   const { disconnect, account } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
-  const {provider} = useWallet();
+  const { provider } = useWallet();
 
   // Determine if user is authenticated and get their role
   const isAuthenticated = !!user.account;
   const userRole = user.role;
-  const isHomePage = location.pathname === '/';
+  const isHomePage = location.pathname === "/";
 
   // Get navigation links based on authentication status and role
   const getAuthenticatedLinks = () => {
     if (userRole === Role.Admin) {
-      return [{ label: 'Admin', to: '/admin' }];
+      return [{ label: "Admin", to: "/admin" }];
     }
     return [
-      { label: 'Campaigns', to: '/campaigns' },
-      { label: 'Profile', to: '/profile' }
+      { label: "Campaigns", to: "/campaigns" },
+      { label: "Profile", to: "/profile" },
     ];
   };
 
   const handleSmoothScroll = (sectionId: string) => {
     if (!isHomePage) {
-      navigate('/', { state: { scrollTo: sectionId } });
+      navigate("/", { state: { scrollTo: sectionId } });
       return;
     }
 
     const element = document.querySelector(sectionId);
     if (element) {
       element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start'
+        behavior: "smooth",
+        block: "start",
       });
     }
     closeMenu();
@@ -70,8 +80,8 @@ export const Navbar = () => {
         const element = document.querySelector(sectionId);
         if (element) {
           element.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
+            behavior: "smooth",
+            block: "start",
           });
         }
       }, 100);
@@ -83,7 +93,7 @@ export const Navbar = () => {
   useEffect(() => {
     if (account && !user.account && user.role !== Role.Admin && provider) {
       console.log("Wallet connected, fetching user details for:", account);
-      dispatch(fetchUserDetails({account, provider}));
+      dispatch(fetchUserDetails({ account, provider }));
     }
   }, [account, dispatch, user.account, user.role, provider]);
 
@@ -91,8 +101,8 @@ export const Navbar = () => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 0);
     };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const closeMenu = () => {
@@ -101,20 +111,20 @@ export const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      console.log('Logging out...', user.account);
+      console.log("Logging out...", user.account);
       dispatch(clearUser());
       await disconnect();
       closeMenu();
-      navigate('/');
-      toast.info('Wallet disconnected');
+      navigate("/");
+      toast.info("Wallet disconnected");
     } catch (error) {
-      console.error('Logout error:', error);
-      toast.error('Error during logout');
+      console.error("Logout error:", error);
+      toast.error("Error during logout");
     }
   };
 
   return (
-    <header 
+    <header
       className={cn(
         "sticky top-0 left-0 right-0 z-50 transition-all duration-300 px-4 md:px-8",
         "bg-gray-900/80 backdrop-blur-lg border-b border-gray-700/50",
@@ -127,7 +137,10 @@ export const Navbar = () => {
             <Vote className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl md:text-2xl font-bold text-white">
-            Block<span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Vote</span>
+            Block
+            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              Vote
+            </span>
           </span>
         </Link>
 
@@ -179,8 +192,12 @@ export const Navbar = () => {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Avatar className="h-8 w-8 ring-2 ring-blue-400/50 transition-all cursor-pointer hover:ring-blue-400">
-                      <AvatarImage 
-                        src={user.details?.profileImageIpfsHash ? getIpfsUrl(user.details.profileImageIpfsHash) : undefined} 
+                      <AvatarImage
+                        src={
+                          user.details?.profileImageIpfsHash
+                            ? getIpfsUrl(user.details.profileImageIpfsHash)
+                            : undefined
+                        }
                         alt="Profile"
                       />
                       <AvatarFallback>
@@ -188,18 +205,21 @@ export const Navbar = () => {
                       </AvatarFallback>
                     </Avatar>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent className="bg-gray-800/90 backdrop-blur-lg border-gray-700 text-gray-200 w-48">
+                  <DropdownMenuContent
+                    className="bg-gray-800/90 backdrop-blur-lg border-gray-700 text-gray-200 pl-2 pr-8"
+                    align="end"
+                  >
                     <DropdownMenuItem asChild>
-                      <Link 
-                        to="/profile" 
+                      <Link
+                        to="/profile"
                         className="flex items-center gap-2 hover:bg-blue-500/10 cursor-pointer w-full"
                       >
                         <User size={16} />
                         Profile
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={handleLogout} 
+                    <DropdownMenuItem
+                      onClick={handleLogout}
                       className="flex items-center gap-2 hover:bg-red-500/10 cursor-pointer text-red-400 hover:text-red-300"
                     >
                       <LogOut size={16} />
@@ -211,13 +231,13 @@ export const Navbar = () => {
 
               {/* Admin Logout Button */}
               {userRole === Role.Admin && (
-                <Button 
-                  onClick={handleLogout} 
-                  variant="ghost" 
+                <Button
+                  onClick={handleLogout}
+                  variant="ghost"
                   className="text-red-400 bg-red-500/10 rounded-full"
                 >
-                  <LogOut size={16} className="mr-2" />
-                  Logout
+                  <LogOut size={16} />
+                  <span className="hidden min-[400px]:inline-block">Logout</span>
                 </Button>
               )}
             </div>
@@ -226,11 +246,29 @@ export const Navbar = () => {
           {/* Mobile Menu Toggle */}
           <Sheet open={isOpen} onOpenChange={setIsOpen}>
             <SheetTrigger asChild className="lg:hidden">
-              <Button variant="ghost" size="icon" className="text-gray-200">
-                {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:text-gray-300 border border-gray-600 hover:border-gray-500 transition-colors"
+              >
+                {isOpen ? (
+                  <X className="h-6 w-6" />
+                ) : (
+                  <Menu className="h-6 w-6" />
+                )}
               </Button>
             </SheetTrigger>
-            <SheetContent side="right" className="bg-gray-800/95 backdrop-blur-lg border-gray-700/50 w-64">
+            <SheetContent
+              side="right"
+              className="bg-gray-800/95 backdrop-blur-lg border-gray-700/50 w-64"
+            >
+              <SheetHeader>
+                <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+                <SheetDescription className="sr-only">
+                  Open mobile navigation menu
+                </SheetDescription>
+              </SheetHeader>
+
               <div className="flex flex-col gap-6 mt-6">
                 {/* Mobile Navigation Links */}
                 <div className="flex flex-col gap-4">
@@ -267,50 +305,11 @@ export const Navbar = () => {
                     </>
                   )}
                 </div>
-
-                {/* Mobile User Section */}
-                {!isAuthenticated ? (
-                  <div className="pt-4 border-t border-gray-700/50">
-                    <WalletConnect />
-                  </div>
-                ) : (
-                  <div className="pt-4 border-t border-gray-700/50 space-y-4">
-                    {/* User Info */}
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10 ring-2 ring-blue-400/50">
-                        <AvatarImage 
-                          src={user.details?.profileImageIpfsHash ? getIpfsUrl(user.details.profileImageIpfsHash) : undefined} 
-                          alt="Profile"
-                        />
-                        <AvatarFallback>
-                          <User className="h-6 w-6" />
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="flex flex-col">
-                        <span className="text-gray-200 text-sm font-medium">
-                          {formatAddress(user.account ?? "")}
-                        </span>
-                        <span className="text-gray-400 text-xs capitalize">
-                          {userRole === Role.Admin ? 'Admin' : 'User'}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Logout Button */}
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-2 text-red-400 hover:text-red-300 transition-colors text-lg py-2 w-full text-left"
-                    >
-                      <LogOut size={18} />
-                      Logout
-                    </button>
-                  </div>
-                )}
               </div>
             </SheetContent>
           </Sheet>
         </div>
       </div>
-    </header> 
+    </header>
   );
 };
