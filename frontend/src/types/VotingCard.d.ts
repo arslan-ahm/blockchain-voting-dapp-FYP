@@ -4,6 +4,11 @@ export interface VotingCardProps {
     name: string;
     votes: string;
     type: string;
+    profileImageIpfsHash?: string;
+    bio?: string;
+    email?: string;
+    contactNumber?: string;
+    supportiveLinks?: string[];
   };
   campaignId: number;
   userVotingStatus: {
@@ -22,4 +27,9 @@ export interface VotingCardProps {
     message: string;
   }>;
   isVoting: boolean;
+  campaignStatus?: string;
+  allCandidates?: Array<{
+    address: string;
+    votes: string;
+  }>;
 }

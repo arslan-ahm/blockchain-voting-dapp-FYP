@@ -11,11 +11,11 @@ import { Role, type VerificationRequestData } from '../../types';
 import type { VerificationRequestsProps } from '../../types/verificationRequests';
 import { getRoleBadgeColor } from '../../utils/helpers';
 
-export const VerificationRequests = ({ 
-  requests, 
-  onProcessVerification, 
-  isLoading = false, 
-  isProcessing = false 
+export const VerificationRequests = ({
+  requests,
+  onProcessVerification,
+  isLoading = false,
+  isProcessing = false
 }: VerificationRequestsProps) => {
   const [activeTab, setActiveTab] = useState("all");
   const [selectedRequest, setSelectedRequest] = useState<VerificationRequestData | null>(null);
@@ -69,18 +69,16 @@ export const VerificationRequests = ({
   return (
     <>
       <Card className="bg-gray-800 border-gray-700">
-        {requests.length > 0 && (
-          <CardHeader>
-            <CardTitle className="text-white mt-4">Verification Requests</CardTitle>
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              <TabsList>
-                <TabsTrigger value="all">All</TabsTrigger>
-                <TabsTrigger value="candidates">Candidates</TabsTrigger>
-                <TabsTrigger value="voters">Voters</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </CardHeader>
-        )}
+        <CardHeader>
+          <CardTitle className="text-white mt-4">Verification Requests</CardTitle>
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="bg-gray-700 text-white">
+              <TabsTrigger value="all">All</TabsTrigger>
+              <TabsTrigger value="candidates">Candidates</TabsTrigger>
+              <TabsTrigger value="voters">Voters</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="flex justify-center items-center p-8">
@@ -89,7 +87,7 @@ export const VerificationRequests = ({
           ) : filteredRequests.length === 0 ? (
             <EmptyState
               icon={UserCheck}
-              title="No Verification Requests"
+              title={`No ${activeTab === "all" ? '' : activeTab === "candidates" ? "Candidate" : "Voter"} Requests`}
               description={
                 activeTab === "all"
                   ? "There are no pending verification requests at the moment."
@@ -117,14 +115,14 @@ export const VerificationRequests = ({
                           <User className="w-6 h-6 text-gray-400" />
                         )}
                       </div>
-                      
+
                       {/* User Info */}
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-1">
                           <h3 className="font-semibold text-white text-lg">
                             {request.userInfo?.name || request.userName || "Unknown User"}
                           </h3>
-                          <Badge 
+                          <Badge
                             className={cn(
                               "select-none text-xs",
                               getRoleBadgeColor(request.requestedRole as Role)
@@ -141,7 +139,7 @@ export const VerificationRequests = ({
                         </p>
                       </div>
                     </div>
-                    
+
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2">
                       <Button
@@ -165,6 +163,7 @@ export const VerificationRequests = ({
                         size="sm"
                         onClick={() => onProcessVerification(request.userAddress, false, '')}
                         variant="destructive"
+                        className='btn-red'
                         disabled={isProcessing}
                       >
                         <X className="w-4 h-4" />
@@ -186,7 +185,7 @@ export const VerificationRequests = ({
               Verification Request Details
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedRequest && (
             <div className="space-y-6">
               {/* User Profile Section */}
@@ -207,7 +206,7 @@ export const VerificationRequests = ({
                     {selectedRequest.userInfo?.name || selectedRequest.userName || "Unknown User"}
                   </h2>
                   <p className="text-gray-400">{selectedRequest.userAddress}</p>
-                  <Badge 
+                  <Badge
                     className={cn(
                       "select-none mt-2",
                       getRoleBadgeColor(selectedRequest.requestedRole as Role)
@@ -227,7 +226,7 @@ export const VerificationRequests = ({
                     <span className="text-white">{selectedRequest.userInfo.email}</span>
                   </div>
                 )}
-                
+
                 {selectedRequest.userInfo?.contactNumber && (
                   <div className="flex items-center space-x-2">
                     <Phone className="w-4 h-4 text-gray-400" />
@@ -235,7 +234,7 @@ export const VerificationRequests = ({
                     <span className="text-white">{selectedRequest.userInfo.contactNumber}</span>
                   </div>
                 )}
-                
+
                 {selectedRequest.userInfo?.dateOfBirth && selectedRequest.userInfo.dateOfBirth > 0 && (
                   <div className="flex items-center space-x-2">
                     <Calendar className="w-4 h-4 text-gray-400" />
@@ -245,7 +244,7 @@ export const VerificationRequests = ({
                     </span>
                   </div>
                 )}
-                
+
                 {selectedRequest.userInfo?.identityNumber && (
                   <div className="flex items-center space-x-2">
                     <FileText className="w-4 h-4 text-gray-400" />
@@ -322,6 +321,7 @@ export const VerificationRequests = ({
                     setIsDetailsOpen(false);
                   }}
                   variant="destructive"
+                  className='btn-red'
                   disabled={isProcessing}
                 >
                   <X className="w-4 h-4 mr-2" />

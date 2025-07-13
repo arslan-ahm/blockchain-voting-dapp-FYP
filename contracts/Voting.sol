@@ -42,7 +42,8 @@ struct VerificationRequest {
     string verificationDocIpfsHash;
     string adminFeedback;
     uint256 requestTimestamp;
-    string userName; // Added for easier display
+    string userName;
+    UserDetails userInfo;
 }
 
 struct Campaign {
@@ -202,7 +203,8 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
             _verificationDocIpfsHash,
             "",
             block.timestamp,
-            userDetails[msg.sender].name
+            userDetails[msg.sender].name,
+            userDetails[msg.sender]
         );
         userRoles[msg.sender] = Role.PendingVerification;
         pendingVerificationRequests.push(msg.sender);
@@ -717,7 +719,8 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
             string[] memory verificationDocIpfsHashes,
             string[] memory adminFeedbacks,
             string[] memory userNames,
-            uint256[] memory timestamps
+            uint256[] memory timestamps,
+            UserDetails[] memory userInfos
         )
     {
         uint256 validCount = 0;
@@ -737,6 +740,7 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
         adminFeedbacks = new string[](validCount);
         userNames = new string[](validCount);
         timestamps = new uint256[](validCount);
+        userInfos = new UserDetails[](validCount);
 
         uint256 index = 0;
         for (uint256 i = 0; i < pendingVerificationRequests.length; i++) {
@@ -754,6 +758,7 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
                 adminFeedbacks[index] = request.adminFeedback;
                 userNames[index] = request.userName;
                 timestamps[index] = request.requestTimestamp;
+                userInfos[index] = request.userInfo;
                 index++;
             }
         }

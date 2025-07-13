@@ -45,7 +45,7 @@ export const WalletConnect = () => {
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
             />
           </svg>
-          Connecting...
+          Loading...
         </span>
       ) : (
         <span className="flex items-center gap-1 min-[600px]:gap-2 text-sm min-[600px]:text-base">

@@ -545,13 +545,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               <DropdownMenuTrigger asChild>
                 <button
                   className={cn(
-                    "px-2 py-2 border-l border-blue-500 rounded-r text-white transition-colors",
-                    !content.trim()
-                      && "bg-gray-600"
+                    "px-2 py-2 border-l border-blue-500 rounded-r text-white transition-colors"
                   )}
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                 >
-                  <ChevronDown className="w-4 h-4" />
+                  <ChevronDown className="w-4 h-4 mt-1" />
                 </button>
               </DropdownMenuTrigger>
 

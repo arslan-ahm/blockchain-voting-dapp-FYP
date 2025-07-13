@@ -7,6 +7,7 @@ import { usePinata } from "../../hooks/usePinata";
 import { Role } from "../../types";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { toast } from "sonner";
+import { fetchJsonFromIpfs } from "../../utils/ipfs";
 import { useWallet } from "../../hooks/useWallet";
 
 const basicDetailsSchema = z.object({
@@ -103,11 +104,14 @@ export const useProfile = () => {
     
     if (campaign.detailsIpfsHash) {
       try {
-        const response = await fetch(`https://ipfs.io/ipfs/${campaign.detailsIpfsHash}`);
-        const data = await response.json();
-        return data.name || campaign.title || `Campaign ${campaign.id}`;
+        const data = await fetchJsonFromIpfs(campaign.detailsIpfsHash);
+        if (data && typeof data === 'object' && 'name' in data) {
+          return (data.name as string) || campaign.title || `Campaign ${campaign.id}`;
+        }
+        return campaign.title || `Campaign ${campaign.id}`;
       } catch (error) {
         console.error("Failed to fetch campaign name from IPFS:", error);
+        return campaign.title || `Campaign ${campaign.id}`;
       }
     }
     return campaign.title || `Campaign ${campaign.id}`;

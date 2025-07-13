@@ -25,6 +25,8 @@ export const AddCampaignDialog = ({
   onSubmit,
   form,
   isCreating,
+  isUploading,
+  onUpload,
 }: AddCampaignDialogProps) => {
   const [dateError, setDateError] = useState<string>("");
   const [campaignRules, setCampaignRules] = useState<string>("");
@@ -38,6 +40,16 @@ export const AddCampaignDialog = ({
     };
     return onSubmit(formData);
   });
+
+  const handleRichTextUpload = async (content: string | File) => {
+    if (typeof content === 'string') {
+      // Handle rich text content upload
+      return await onUpload(content, form.getValues("startDate"), form.getValues("endDate"));
+    } else {
+      // Handle file upload
+      return await onUpload(content);
+    }
+  };
 
   // Calculate minimum dates
   const now = new Date();
@@ -210,7 +222,9 @@ export const AddCampaignDialog = ({
               <div className="bg-gray-800 rounded-lg border border-gray-600">
                   <RichTextEditor
                     value={campaignRules}
+                    onUpload={handleRichTextUpload}
                     onChange={setCampaignRules}
+                    isUploading={isUploading}
                     placeholder="Enter detailed campaign rules and contract terms..."
                   />
                 </div>

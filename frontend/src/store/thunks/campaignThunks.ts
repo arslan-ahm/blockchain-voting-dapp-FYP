@@ -142,21 +142,68 @@ export const getCampaignParticipants = createAsyncThunk(
       const [voters, voterNames, hasVotedList] =
         await contract.getCampaignVoters(campaignId);
 
-      const candidateDetails = candidates.map(
-        (candidate: string, index: number) => ({
-          address: candidate,
-          name: candidateNames[index],
-          votes: voteCounts[index].toString(),
-          type: "candidate",
-        })
+      // Helper function to fetch user details including profile image
+      const fetchUserDetails = async (address: string) => {
+        try {
+          const userDetails = await contract.userDetails(address);
+          return {
+            name: userDetails.name || "",
+            email: userDetails.email || "",
+            dateOfBirth: Number(userDetails.dateOfBirth) || 0,
+            identityNumber: userDetails.identityNumber || "",
+            contactNumber: userDetails.contactNumber || "",
+            bio: userDetails.bio || "",
+            profileImageIpfsHash: userDetails.profileImageIpfsHash || "",
+            supportiveLinks: Array.isArray(userDetails.supportiveLinks)
+              ? userDetails.supportiveLinks
+              : [],
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch user details for ${address}:`, error);
+          return null;
+        }
+      };
+
+      // Fetch user details for all candidates
+      const candidateDetailsPromises = candidates.map(
+        async (candidate: string, index: number) => {
+          const userDetails = await fetchUserDetails(candidate);
+          return {
+            address: candidate,
+            name: candidateNames[index] || userDetails?.name || "",
+            votes: voteCounts[index].toString(),
+            type: "candidate",
+            profileImageIpfsHash: userDetails?.profileImageIpfsHash || "",
+            email: userDetails?.email || "",
+            bio: userDetails?.bio || "",
+            contactNumber: userDetails?.contactNumber || "",
+            supportiveLinks: userDetails?.supportiveLinks || [],
+          };
+        }
       );
 
-      const voterDetails = voters.map((voter: string, index: number) => ({
-        address: voter,
-        name: voterNames[index],
-        hasVoted: hasVotedList[index],
-        type: "voter",
-      }));
+      // Fetch user details for all voters
+      const voterDetailsPromises = voters.map(
+        async (voter: string, index: number) => {
+          const userDetails = await fetchUserDetails(voter);
+          return {
+            address: voter,
+            name: voterNames[index] || userDetails?.name || "",
+            hasVoted: hasVotedList[index],
+            type: "voter",
+            profileImageIpfsHash: userDetails?.profileImageIpfsHash || "",
+            email: userDetails?.email || "",
+            bio: userDetails?.bio || "",
+            contactNumber: userDetails?.contactNumber || "",
+          };
+        }
+      );
+
+      // Wait for all user details to be fetched
+      const [candidateDetails, voterDetails] = await Promise.all([
+        Promise.all(candidateDetailsPromises),
+        Promise.all(voterDetailsPromises),
+      ]);
 
       return {
         campaignId,
@@ -164,6 +211,7 @@ export const getCampaignParticipants = createAsyncThunk(
         voters: voterDetails,
       };
     } catch (error) {
+      console.error("Failed to fetch campaign participants:", error);
       toast.error("Failed to fetch campaign participants");
       throw error;
     }

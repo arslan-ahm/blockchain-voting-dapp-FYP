@@ -22,12 +22,11 @@ import { Button } from "../../components/ui/button";
 import { getIpfsUrl } from "../../utils/ipfs";
 import { Role } from "../../types";
 import { useProfile } from "./useProfile";
-import { User, ChevronRight, Newspaper } from "lucide-react";
+import { User, ChevronRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { BasicDetailsForm } from "../../components/forms/BasicDetailsForm";
 import { VerificationRequestForm } from "../../components/forms/VerificationForm";
 import { ProfilePreview } from "../../components/ProfilePreview";
-import { EmptyState } from "../../components/admin/EmptyState";
 
 export const Profile = () => {
   const {
@@ -161,12 +160,53 @@ export const Profile = () => {
                   </>
                 )}
 
-                <Tabs
-                  value={activeTab}
-                  onValueChange={setActiveTab}
-                  className="w-full"
-                >
-                  {hasActiveCampaign && (
+                {/* User has already registered - Show status */}
+                {!canUpdateProfile && user.role !== Role.Unverified && user.role !== Role.PendingVerification && (
+                  <div className="bg-green-900/20 border border-green-700 rounded-lg p-4 sm:p-6 mb-6">
+                    <h3 className="text-lg font-semibold text-green-400 mb-2">
+                      Registration Complete
+                    </h3>
+                    <div className="space-y-3">
+                      <p className="text-gray-300">
+                        You have successfully registered with the role of{" "}
+                        <span className="font-semibold text-green-400">
+                          {user.role === Role.Voter ? "Voter" : 
+                           user.role === Role.Candidate ? "Candidate" : "User"}
+                        </span>
+                      </p>
+                      {campaignName && (
+                        <p className="text-sm text-gray-400">
+                          Active Campaign: <span className="text-gray-300">{campaignName}</span>
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-400">
+                        Profile updates are locked once you have been assigned a role. 
+                        You can view campaigns in the navigation menu.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* No active campaigns */}
+                {!hasActiveCampaign && !campaignName && canUpdateProfile && (
+                  <div className="bg-amber-900/20 border border-amber-700 rounded-lg p-4 sm:p-6 mb-6">
+                    <h3 className="text-lg font-semibold text-amber-400 mb-2">
+                      No Active Campaigns
+                    </h3>
+                    <p className="text-gray-300">
+                      There are currently no active campaigns available. 
+                      Please check back later when a campaign becomes available.
+                    </p>
+                  </div>
+                )}
+
+                {/* Show forms only if user can update profile */}
+                {canUpdateProfile && (
+                  <Tabs
+                    value={activeTab}
+                    onValueChange={setActiveTab}
+                    className="w-full"
+                  >
                     <TabsList className="grid w-full grid-cols-2 bg-gray-700">
                       <TabsTrigger
                         value="details"
@@ -182,9 +222,8 @@ export const Profile = () => {
                         Request Role
                       </TabsTrigger>
                     </TabsList>
-                  )}
-                  <TabsContent value="details" className="mt-6">
-                    {canUpdateProfile ? (
+
+                    <TabsContent value="details" className="mt-6">
                       <div className="space-y-6">
                         <BasicDetailsForm
                           form={basicDetailsForm}
@@ -207,39 +246,32 @@ export const Profile = () => {
                           </div>
                         )}
                       </div>
-                    ) : (
-                      <EmptyState
-                        icon={Newspaper}
-                        title="No Active Campaigns"
-                        description="Profile updates are currently disabled. Please check
-                      back when there's an active or upcoming campaign."
-                      />
-                    )}
-                  </TabsContent>
+                    </TabsContent>
 
-                  <TabsContent value="verification" className="mt-6">
-                    {hasActiveCampaign ? (
-                      <div className="space-y-6">
-                        <VerificationRequestForm
-                          form={verificationForm}
-                          onSubmit={onVerificationSubmit}
-                          isLoading={isVerificationLoading}
-                          supportiveLinks={supportiveLinks}
-                          addSupportiveLink={addSupportiveLink}
-                          removeSupportiveLink={removeSupportiveLink}
-                          updateSupportiveLink={updateSupportiveLink}
-                        />
-                      </div>
-                    ) : (
-                      <div className="bg-gray-750 rounded-lg p-4 sm:p-6">
-                        <p className="text-gray-400">
-                          No active campaigns. Verification requests are
-                          disabled.
-                        </p>
-                      </div>
-                    )}
-                  </TabsContent>
-                </Tabs>
+                    <TabsContent value="verification" className="mt-6">
+                      {hasActiveCampaign ? (
+                        <div className="space-y-6">
+                          <VerificationRequestForm
+                            form={verificationForm}
+                            onSubmit={onVerificationSubmit}
+                            isLoading={isVerificationLoading}
+                            supportiveLinks={supportiveLinks}
+                            addSupportiveLink={addSupportiveLink}
+                            removeSupportiveLink={removeSupportiveLink}
+                            updateSupportiveLink={updateSupportiveLink}
+                          />
+                        </div>
+                      ) : (
+                        <div className="bg-gray-750 rounded-lg p-4 sm:p-6">
+                          <p className="text-gray-400">
+                            No active campaigns. Verification requests are
+                            disabled.
+                          </p>
+                        </div>
+                      )}
+                    </TabsContent>
+                  </Tabs>
+                )}
               </CardContent>
             </Card>
           </div>

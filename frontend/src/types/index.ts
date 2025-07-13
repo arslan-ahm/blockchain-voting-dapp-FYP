@@ -105,6 +105,11 @@ export interface CandidateData {
   name: string;
   voteCount: number;
   role: string;
+  profileImageIpfsHash?: string;
+  email?: string;
+  contactNumber?: string;
+  bio?: string;
+  supportiveLinks?: string[];
 }
 
 export interface VoterData {
@@ -112,6 +117,10 @@ export interface VoterData {
   name: string;
   hasVoted: boolean;
   role: string;
+  profileImageIpfsHash?: string;
+  email?: string;
+  contactNumber?: string;
+  bio?: string;
 }
 
 export interface AdminDashboardData {

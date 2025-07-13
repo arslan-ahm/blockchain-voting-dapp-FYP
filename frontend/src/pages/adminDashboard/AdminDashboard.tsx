@@ -56,6 +56,7 @@ const AdminDashboard = () => {
     adminDashboard,
     handleProcessVerification,
     processingVerification,
+    handleUploadDocument
   } = useAdminDashboard();
 
   // Handle navigation to campaign details
@@ -103,7 +104,9 @@ const AdminDashboard = () => {
         onClose={closeCreateModal}
         form={campaignForm}
         onSubmit={handleCreateCampaign}
-        isCreating={creatingCampaign || isUploading}
+        isCreating={creatingCampaign}
+        isUploading={isUploading}
+        onUpload={handleUploadDocument}
       />
       <DeleteCampaignDialog
         isOpen={showDeleteModal}
