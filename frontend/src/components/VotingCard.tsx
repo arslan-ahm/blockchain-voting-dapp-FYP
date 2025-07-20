@@ -181,53 +181,76 @@ const VotingCard: React.FC<VotingCardProps> = ({
 
         {/* Action Buttons - Fixed at bottom */}
         <div className="space-y-3 mt-6">
-          {userVotingStatus.canVote && !isVotedFor && (
-            <Button
-              onClick={handleVote}
-              disabled={isSubmitting || isVoting}
-              className={`w-full py-3 text-white font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105 transform-gpu ${
-                shouldShowLeaderStyles
-                  ? "bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700"
-                  : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
-              }`}
-            >
-              {isSubmitting || isVoting ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  Casting Vote...
-                </div>
-              ) : (
-                <div className="flex items-center justify-center gap-2">
-                  <Vote className="h-4 w-4" />
-                  Vote for {candidate.name?.split(' ')[0] || 'Candidate'}
+          {/* Don't show any voting buttons or messages for admin users */}
+          {userVotingStatus.isAdmin ? (
+            <div className="text-center py-4 bg-blue-500/10 rounded-lg border border-blue-500/30">
+              <span className="text-sm text-blue-400 font-medium">
+                Admin View - Monitoring Mode
+              </span>
+            </div>
+          ) : (
+            <>
+              {userVotingStatus.canVote && !isVotedFor && (
+                <Button
+                  onClick={handleVote}
+                  disabled={isSubmitting || isVoting}
+                  className={`w-full py-3 text-white font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105 transform-gpu ${
+                    shouldShowLeaderStyles
+                      ? "bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700"
+                      : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+                  }`}
+                >
+                  {isSubmitting || isVoting ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      Casting Vote...
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <Vote className="h-4 w-4" />
+                      Vote for {candidate.name?.split(' ')[0] || 'Candidate'}
+                    </div>
+                  )}
+                </Button>
+              )}
+
+              {isVotedFor && (
+                <div className="flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-400/30 shadow-lg">
+                  <CheckCircle className="h-5 w-5 text-green-400" />
+                  <span className="text-sm font-bold text-green-300">
+                    You voted for this candidate
+                  </span>
                 </div>
               )}
-            </Button>
-          )}
 
-          {isVotedFor && (
-            <div className="flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg border border-green-400/30 shadow-lg">
-              <CheckCircle className="h-5 w-5 text-green-400" />
-              <span className="text-sm font-bold text-green-300">
-                You voted for this candidate
-              </span>
-            </div>
-          )}
+              {userVotingStatus.hasVoted && !isVotedFor && (
+                <div className="text-center py-4 bg-gray-700/50 rounded-lg border border-gray-600">
+                  <span className="text-sm text-gray-400 font-medium">
+                    You have already voted in this campaign
+                  </span>
+                </div>
+              )}
 
-          {userVotingStatus.hasVoted && !isVotedFor && (
-            <div className="text-center py-4 bg-gray-700/50 rounded-lg border border-gray-600">
-              <span className="text-sm text-gray-400 font-medium">
-                You have already voted in this campaign
-              </span>
-            </div>
-          )}
-
-          {!userVotingStatus.canVote && !userVotingStatus.hasVoted && (
-            <div className="text-center py-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
-              <span className="text-sm text-amber-400 font-medium">
-                You need to be registered to vote
-              </span>
-            </div>
+              {!userVotingStatus.canVote && !userVotingStatus.hasVoted && (
+                <div className="text-center py-4 bg-amber-500/10 rounded-lg border border-amber-500/30">
+                  <span className="text-sm text-amber-400 font-medium">
+                    {userVotingStatus.requiresVerification 
+                      ? "You need to request voter verification to vote"
+                      : userVotingStatus.isPendingVerification
+                      ? "Your verification request is pending admin approval"
+                      : userVotingStatus.hasVerifiedRole
+                      ? (() => {
+                          // For verified voters, provide campaign-specific messages
+                          if (campaignStatus === "upcoming") return "Get ready to vote! Campaign starts soon";
+                          if (campaignStatus === "ended") return "Campaign has ended - voting is no longer available";
+                          return "You're ready to vote when the campaign becomes active";
+                        })()
+                      : "You need voter verification to participate"
+                    }
+                  </span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </CardContent>

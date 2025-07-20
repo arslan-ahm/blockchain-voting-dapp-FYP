@@ -16,6 +16,8 @@ import {
   adminManualCloseCampaign,
   adminProcessVerification,
   fetchVerificationRequests,
+  setPublicCampaignForDisplay,
+  checkAndAutoSelectUrgentCampaign,
 } from "../../store/thunks/adminThunks";
 
 import {
@@ -27,6 +29,12 @@ import {
   selectProcessingVerification,
   selectClosingCampaign,
   selectCampaignList,
+  selectSelectedCampaignId,
+  selectPublicCampaignId,
+  selectAutoSelectUrgent,
+  selectPublicCampaign,
+  setSelectedCampaign,
+  setAutoSelectUrgent,
 } from "../../store/slices/adminSlice";
 import type {
   ChartDataPoint,
@@ -71,11 +79,13 @@ export const useAdminDashboard = () => {
   const processingVerification = useAppSelector(selectProcessingVerification);
   const adminDashboard = useAppSelector(selectAdminDashboard);
   const adminLoading = useAppSelector(selectAdminLoading);
+  const selectedCampaignId = useAppSelector(selectSelectedCampaignId);
+  const publicCampaignId = useAppSelector(selectPublicCampaignId);
+  const autoSelectUrgent = useAppSelector(selectAutoSelectUrgent);
+  const publicCampaign = useAppSelector(selectPublicCampaign);
   useAppSelector(selectAdminError);
 
   // Local state
-  const [selectedCampaign, setSelectedCampaign] = useState<number | null>(null);
-  const [isLoadingCampaignData, setIsLoadingCampaignData] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "candidates" | "voters">(
     "all"
   );
@@ -109,22 +119,30 @@ export const useAdminDashboard = () => {
 
   // Set default selected campaign
   useEffect(() => {
-    if (campaigns.length > 0 && selectedCampaign === null) {
-      setSelectedCampaign(campaigns[0].id);
+    if (campaigns.length > 0 && selectedCampaignId === 0) {
+      dispatch(setSelectedCampaign(campaigns[0].id));
     }
-  }, [campaigns, selectedCampaign]);
+  }, [campaigns, selectedCampaignId, dispatch]);
 
   // Fetch data for the selected campaign
   useEffect(() => {
-    if (selectedCampaign !== null && signer && provider) {
-      setIsLoadingCampaignData(true);
+    if (selectedCampaignId !== 0 && signer && provider) {
       dispatch(
-        fetchAdminDashboardData({ campaignId: selectedCampaign, signer })
-      ).finally(() => {
-        setIsLoadingCampaignData(false);
-      });
+        fetchAdminDashboardData({ campaignId: selectedCampaignId, signer })
+      );
     }
-  }, [selectedCampaign, dispatch, signer, provider]);
+  }, [selectedCampaignId, dispatch, signer, provider]);
+
+  // Check for urgent campaigns periodically
+  useEffect(() => {
+    if (autoSelectUrgent) {
+      const interval = setInterval(() => {
+        dispatch(checkAndAutoSelectUrgentCampaign());
+      }, 60000); // Check every minute
+
+      return () => clearInterval(interval);
+    }
+  }, [autoSelectUrgent, dispatch]);
 
   // Calculate dashboard stats
   const calculateDashboardStats = () => {
@@ -384,9 +402,28 @@ export const useAdminDashboard = () => {
     ].filter((item) => item.value > 0);
   };
 
-  // Handlers
-  const handleSelectCampaign = (campaignId: number) => {
-    setSelectedCampaign(campaignId);
+  // Enhanced campaign selection handler
+  const handleSelectCampaign = async (campaignId: number) => {
+    dispatch(setSelectedCampaign(campaignId));
+  };
+
+  // Handle public campaign selection
+  const handleSetPublicCampaign = async (campaignId: number) => {
+    if (!signer) {
+      toast.error("Please connect your wallet to set public campaign");
+      return;
+    }
+
+    try {
+      await dispatch(setPublicCampaignForDisplay({ campaignId, signer })).unwrap();
+    } catch (error) {
+      console.error("Failed to set public campaign:", error);
+    }
+  };
+
+  // Toggle auto-select urgent campaigns
+  const handleToggleAutoSelect = (enabled: boolean) => {
+    dispatch(setAutoSelectUrgent(enabled));
   };
 
   const handleUploadDocument: (
@@ -486,12 +523,13 @@ export const useAdminDashboard = () => {
 
     await dispatch(adminDeleteCampaign({ campaignId, signer })).unwrap();
     toast.success("Campaign deleted successfully");
-    if (selectedCampaign === campaignId) {
-      setSelectedCampaign(
-        campaigns.length > 1
-          ? campaigns.find((c) => c.id !== campaignId)?.id ?? null
-          : null
-      );
+    if (selectedCampaignId === campaignId) {
+      const remainingCampaigns = campaigns.filter((c) => c.id !== campaignId);
+      if (remainingCampaigns.length > 0) {
+        dispatch(setSelectedCampaign(remainingCampaigns[0].id));
+      } else {
+        dispatch(setSelectedCampaign(0));
+      }
     }
     dispatch(fetchAllCampaignIds({ provider }));
     setShowDeleteModal(false);
@@ -519,7 +557,23 @@ export const useAdminDashboard = () => {
         adminProcessVerification({ userAddress, approved, feedback, signer })
       ).unwrap();
       toast.success("Verification processed successfully");
+      
+      // Refresh verification requests
       dispatch(fetchVerificationRequests({ signer }));
+      
+      // Refresh current campaign data to show updated participants
+      if (selectedCampaignId) {
+        dispatch(fetchAdminDashboardData({ 
+          campaignId: selectedCampaignId, 
+          signer,
+          forceRefresh: true
+        }));
+      }
+      
+      // Also refresh all campaign IDs to ensure consistency
+      if (provider) {
+        dispatch(fetchAllCampaignIds({ provider }));
+      }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
@@ -550,7 +604,10 @@ export const useAdminDashboard = () => {
   return {
     // State & Data
     campaigns: campaignStats,
-    selectedCampaign,
+    selectedCampaign: selectedCampaignId,
+    publicCampaignId,
+    autoSelectUrgent,
+    publicCampaign,
     selectedCampaignData,
     verificationRequests,
     adminDashboard,
@@ -562,7 +619,6 @@ export const useAdminDashboard = () => {
     campaignToDelete,
     campaignForm,
     adminLoading,
-    isLoadingCampaignData,
     isUploading,
     creatingCampaign,
     deletingCampaign,
@@ -581,6 +637,8 @@ export const useAdminDashboard = () => {
 
     // Handlers & Actions
     handleSelectCampaign,
+    handleSetPublicCampaign,
+    handleToggleAutoSelect,
     handleCreateCampaign,
     handleDeleteCampaign,
     handleCloseCampaign,

@@ -11,6 +11,7 @@ import {
   getCandidateVotes,
   getAllCandidateVotes,
   castVote,
+  castVoteWithRoleCheck,
   getUserVote,
   manualCloseCampaign,
   checkUpkeep,
@@ -356,6 +357,37 @@ const campaignSlice = createSlice({
         }
       })
       .addCase(castVote.rejected, (state, action) => {
+        state.voteStatus = "error";
+        state.castingVote = false;
+        state.error = action.error.message || "Failed to cast vote";
+      })
+      
+      // Enhanced role-based voting
+      .addCase(castVoteWithRoleCheck.pending, (state) => {
+        state.voteStatus = "pending";
+        state.castingVote = true;
+        state.error = null;
+      })
+      .addCase(castVoteWithRoleCheck.fulfilled, (state, action) => {
+        state.voteStatus = "success";
+        state.castingVote = false;
+        state.transactionHash = action.payload.transactionHash;
+        
+        const existingVoteIndex = state.userVotes.findIndex(
+          v => v.campaignId === action.payload.campaignId && v.userAddress === action.payload.userAddress
+        );
+        
+        if (existingVoteIndex >= 0) {
+          state.userVotes[existingVoteIndex].votedCandidate = action.payload.candidate;
+        } else {
+          state.userVotes.push({
+            campaignId: action.payload.campaignId,
+            userAddress: action.payload.userAddress,
+            votedCandidate: action.payload.candidate
+          });
+        }
+      })
+      .addCase(castVoteWithRoleCheck.rejected, (state, action) => {
         state.voteStatus = "error";
         state.castingVote = false;
         state.error = action.error.message || "Failed to cast vote";

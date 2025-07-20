@@ -7,18 +7,31 @@
     "@pinata/sdk": "^2.1.0",
     "@vitejs/plugin-react": "^4.4.0",
     "buffer": "^6.0.3",
+    "concurrently": "^8.2.0",
+    "dotenv": "^16.3.1",
     "ethers": "^6.13.5",
     "globalthis": "^1.0.4",
     "hardhat": "^2.23.0",
     "util": "^0.12.5"
   },
   "scripts": {
-    "server": "hardhat node",
-    "deploy:local": "hardhat ignition deploy ignition/modules/Voting.js --network localhost",
-    "deploy:reset": "hardhat ignition deploy ignition/modules/Voting.js --network localhost --reset",
-    "deploy:save": "hardhat run scripts/deploy-and-save.js --network localhost",
-    "compile": "hardhat compile",
-    "test": "hardhat test",
-    "clean": "hardhat clean"
+    "setup": "node scripts/setup.js",
+    "install-all": "bun install && cd frontend && bun install",
+    "server": "bunx hardhat node",
+    "compile": "bunx hardhat compile",
+    "test": "bunx hardhat test",
+    "clean": "bunx hardhat clean",
+    "validate": "node scripts/validate-environment.js",
+    "deploy:local": "bunx hardhat ignition deploy ignition/modules/Voting.js --network localhost",
+    "deploy:local-reset": "bunx hardhat ignition deploy ignition/modules/Voting.js --network localhost --reset",
+    "deploy:local-save": "bunx hardhat run scripts/deploy-simple.js --network localhost",
+    "deploy:sepolia": "bun run validate && NODE_ENV=production bunx hardhat run scripts/deploy-simple.js --network sepolia",
+    "deploy:sepolia-verify": "bun run validate && NODE_ENV=production bunx hardhat run scripts/deploy-simple.js --network sepolia && bunx hardhat verify --network sepolia",
+    "deploy:mainnet": "bun run validate && NODE_ENV=production bunx hardhat run scripts/deploy-simple.js --network mainnet",
+    "verify:sepolia": "bunx hardhat verify --network sepolia",
+    "verify:mainnet": "bunx hardhat verify --network mainnet",
+    "dev": "concurrently \"bun run server\" \"cd frontend && bun run dev\"",
+    "build": "bun run compile && cd frontend && bun run build",
+    "start": "cd frontend && bun run preview"
   }
 }

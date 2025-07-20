@@ -1018,3 +1018,109 @@ export const getMonthlyCampaigns = createAsyncThunk(
     }
   }
 );
+
+// Enhanced voting function that allows verified voters to cast votes directly
+export const castVoteWithRoleCheck = createAsyncThunk(
+  "campaign/castVoteWithRoleCheck",
+  async ({
+    campaignId,
+    candidate,
+    signer,
+    userAddress,
+  }: {
+    campaignId: number;
+    candidate: string;
+    signer: ethers.Signer;
+    userAddress: string;
+  }) => {
+    if (!signer) throw new Error("Wallet not connected");
+    if (!userAddress) throw new Error("User address required");
+
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
+
+    try {
+      // First check if user has voter role
+      const userRole = await contract.userRoles(userAddress);
+      
+      // Role.Voter = 1 in the enum
+      if (Number(userRole) !== 1) {
+        throw new Error("You must have a verified voter role to participate in voting");
+      }
+
+      // Check if user is registered for this specific campaign
+      const [isVoter] = await contract.isUserRegisteredForCampaign(campaignId, userAddress);
+      
+      // If not registered but has voter role, auto-register for the campaign
+      if (!isVoter && Number(userRole) === 1) {
+        console.log("Auto-registering voter for campaign...");
+        try {
+          const registerTx = await contract.registerForCampaign(campaignId);
+          await registerTx.wait();
+          toast.success("Successfully registered for voting!");
+        } catch (registrationError) {
+          console.warn("Auto-registration failed, attempting direct vote:", registrationError);
+          // Continue with voting attempt - the contract will handle the registration internally
+        }
+      }
+
+      // Check if already voted
+      const existingVote = await contract.votes(userAddress, campaignId);
+      if (existingVote !== ethers.ZeroAddress) {
+        throw new Error("You have already voted in this campaign");
+      }
+
+      // Get campaign details to validate timing
+      const campaignDetails = await contract.getCampaignDetails(campaignId);
+      const now = Math.floor(Date.now() / 1000);
+      
+      if (now < Number(campaignDetails.startDate)) {
+        throw new Error("Campaign has not started yet");
+      }
+      
+      if (now >= Number(campaignDetails.endDate) || !campaignDetails.isOpen) {
+        throw new Error("Campaign has ended");
+      }
+
+      // Cast the vote
+      console.log(`Casting vote for candidate ${candidate} in campaign ${campaignId}`);
+      const tx = await contract.vote(campaignId, candidate);
+      const receipt = await tx.wait();
+      
+      toast.success("Vote cast successfully!");
+
+      return {
+        transactionHash: receipt.transactionHash,
+        campaignId,
+        candidate,
+        userAddress,
+      };
+    } catch (error) {
+      console.error("Failed to cast vote with role check:", error);
+      
+      // Enhanced error handling
+      if (error instanceof Error) {
+        if (error.message.includes("Not a voter")) {
+          toast.error("You need to have a verified voter role to vote. Please request verification from admin.");
+        } else if (error.message.includes("Already voted")) {
+          toast.error("You have already voted in this campaign");
+        } else if (error.message.includes("Campaign not started")) {
+          toast.error("Campaign has not started yet");
+        } else if (error.message.includes("Campaign ended")) {
+          toast.error("Campaign has ended");
+        } else if (error.message.includes("Invalid candidate")) {
+          toast.error("Invalid candidate selected");
+        } else if (error.message.includes("Not registered")) {
+          toast.error("Registration for this campaign failed. Please try again.");
+        } else {
+          toast.error(error.message || "Failed to cast vote");
+        }
+      }
+      
+      throw error;
+    }
+  }
+);

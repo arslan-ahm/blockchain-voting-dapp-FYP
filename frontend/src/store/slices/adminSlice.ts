@@ -15,6 +15,8 @@ import {
   adminProcessVerification,
   getVerificationRequestDetails,
   fetchVerificationRequests,
+  setPublicCampaignForDisplay,
+  checkAndAutoSelectUrgentCampaign,
 } from "../thunks/adminThunks";
 import { getStatusAsNumber, mapCampaignStatus } from "../../utils/helpers";
 
@@ -26,6 +28,8 @@ interface AdminState extends CampaignState {
   verificationError: string | null;
   processingVerification: boolean;
   selectedCampaignId: number;
+  publicCampaignId: number; // Campaign selected for public display
+  autoSelectUrgent: boolean; // Whether to auto-select urgent campaigns
   campaignList: Array<{
     id: number;
     title: string;
@@ -106,6 +110,8 @@ const initialState: AdminState = {
   verificationError: null,
   processingVerification: false,
   selectedCampaignId: 0,
+  publicCampaignId: 0,
+  autoSelectUrgent: true,
   campaignList: [],
   creatingCampaign: false,
   deletingCampaign: false,
@@ -201,6 +207,35 @@ export const adminSlice = createSlice({
     },
     setSelectedCampaign: (state, action: PayloadAction<number>) => {
       state.selectedCampaignId = action.payload;
+    },
+    setPublicCampaign: (state, action: PayloadAction<number>) => {
+      state.publicCampaignId = action.payload;
+    },
+    setAutoSelectUrgent: (state, action: PayloadAction<boolean>) => {
+      state.autoSelectUrgent = action.payload;
+    },
+    autoSelectUrgentCampaign: (state) => {
+      if (!state.autoSelectUrgent || state.campaignList.length === 0) return;
+
+      const now = Math.floor(Date.now() / 1000);
+      const urgentThreshold = 2 * 60 * 60; // 2 hours
+
+      // Find campaigns starting within 2 hours
+      const urgentCampaigns = state.campaignList
+        .filter((campaign) => {
+          const isUpcoming = campaign.status === 0; // Upcoming status
+          const timeUntilStart = campaign.startDate ? campaign.startDate - now : Infinity;
+          return (
+            isUpcoming &&
+            timeUntilStart > 0 &&
+            timeUntilStart <= urgentThreshold
+          );
+        })
+        .sort((a, b) => (a.startDate || 0) - (b.startDate || 0)); // Sort by start date
+
+      if (urgentCampaigns.length > 0) {
+        state.publicCampaignId = urgentCampaigns[0].id;
+      }
     },
     removeVerificationRequest: (state, action: PayloadAction<string>) => {
       state.verificationRequests = state.verificationRequests.filter(
@@ -439,6 +474,18 @@ export const adminSlice = createSlice({
         state.fetchingVerificationRequests = false;
         state.verificationError =
           (action.payload as string) || "Failed to fetch verification requests";
+      })
+
+      // Set public campaign for display
+      .addCase(setPublicCampaignForDisplay.fulfilled, (state, action) => {
+        state.publicCampaignId = action.payload;
+      })
+
+      // Auto-select urgent campaign
+      .addCase(checkAndAutoSelectUrgentCampaign.fulfilled, (state, action) => {
+        if (action.payload !== null) {
+          state.publicCampaignId = action.payload;
+        }
       });
   },
 });
@@ -451,6 +498,9 @@ export const {
   updateCampaignStatus,
   updateUserVote,
   setSelectedCampaign,
+  setPublicCampaign,
+  setAutoSelectUrgent,
+  autoSelectUrgentCampaign,
   removeVerificationRequest,
   setSelectedVerificationRequest,
 } = adminSlice.actions;
@@ -472,6 +522,14 @@ export const selectProcessingVerification = (state: { admin: AdminState }) =>
   state.admin.processingVerification;
 export const selectSelectedCampaignId = (state: { admin: AdminState }) =>
   state.admin.selectedCampaignId;
+export const selectPublicCampaignId = (state: { admin: AdminState }) =>
+  state.admin.publicCampaignId;
+export const selectAutoSelectUrgent = (state: { admin: AdminState }) =>
+  state.admin.autoSelectUrgent;
+export const selectPublicCampaign = (state: { admin: AdminState }) => {
+  const publicCampaignId = state.admin.publicCampaignId;
+  return state.admin.campaignList.find(campaign => campaign.id === publicCampaignId) || null;
+};
 export const selectCampaignList = (state: { admin: AdminState }) =>
   state.admin.campaignList;
 export const selectCreatingCampaign = (state: { admin: AdminState }) =>

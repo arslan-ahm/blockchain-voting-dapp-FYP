@@ -1,7 +1,8 @@
-// scripts/deploy-and-save.js
+// scripts/deploy-simple.js
 const fs = require('fs');
 const path = require('path');
-const { ignition } = require("hardhat");
+const hre = require("hardhat");
+require("dotenv").config();
 
 async function main() {
   const network = hre.network.name;
@@ -10,14 +11,29 @@ async function main() {
   console.log(`Deploying to network: ${network}`);
   console.log(`Environment: ${nodeEnv}`);
   
-  // Deploy the contract using Hardhat Ignition
+  // Get admin address based on environment
+  let adminAddress;
+  if (nodeEnv === "production") {
+    adminAddress = process.env.ADMIN_ADDRESS_PROD;
+    if (!adminAddress) {
+      throw new Error("ADMIN_ADDRESS_PROD is required for production deployment");
+    }
+  } else {
+    adminAddress = process.env.ADMIN_ADDRESS_DEV || "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266";
+  }
+  
+  console.log(`Using admin address: ${adminAddress}`);
+  
+  // Deploy the contract
   console.log("Deploying Voting contract...");
   
-  try {
-    const { voting } = await ignition.deploy("VotingModule");
-    
-    const contractAddress = await voting.getAddress();
-    console.log("Voting contract deployed to:", contractAddress);
+  const Voting = await hre.ethers.getContractFactory("Voting");
+  const voting = await Voting.deploy(adminAddress);
+  
+  await voting.waitForDeployment();
+  const contractAddress = await voting.getAddress();
+  
+  console.log("Voting contract deployed to:", contractAddress);
   
   // Get network configuration
   const networkConfig = {
@@ -77,7 +93,26 @@ export const NETWORK_CONFIG = {
   fs.writeFileSync(constantsPath, contractConstants);
   console.log("Contract constants saved to:", constantsPath);
   
-  // Also save deployment info to deployments folder
+  // Update frontend .env file
+  const envPath = path.join(__dirname, "../frontend/.env");
+  if (fs.existsSync(envPath)) {
+    let envContent = fs.readFileSync(envPath, 'utf8');
+    
+    // Update contract address
+    if (envContent.includes('VITE_CONTRACT_ADDRESS=')) {
+      envContent = envContent.replace(
+        /VITE_CONTRACT_ADDRESS=.*/,
+        `VITE_CONTRACT_ADDRESS=${contractAddress}`
+      );
+    } else {
+      envContent += `\nVITE_CONTRACT_ADDRESS=${contractAddress}`;
+    }
+    
+    fs.writeFileSync(envPath, envContent);
+    console.log("Frontend .env updated with contract address");
+  }
+  
+  // Save deployment info
   const deploymentInfo = {
     contractAddress,
     networkName: currentNetwork.name,
@@ -85,8 +120,7 @@ export const NETWORK_CONFIG = {
     rpcUrl: currentNetwork.rpcUrl,
     blockExplorer: currentNetwork.blockExplorer,
     deploymentTime: new Date().toISOString(),
-    blockNumber: await voting.deploymentTransaction()?.blockNumber || 0,
-    transactionHash: await voting.deploymentTransaction()?.hash || "",
+    adminAddress: adminAddress,
     environment: nodeEnv
   };
   
@@ -100,37 +134,11 @@ export const NETWORK_CONFIG = {
   fs.writeFileSync(deploymentPath, JSON.stringify(deploymentInfo, null, 2));
   console.log("Deployment info saved to:", deploymentPath);
   
-  // Update environment file for frontend
-  const envPath = path.join(__dirname, "../frontend/.env");
-  let envContent = '';
-  
-  // Read existing .env file if it exists
-  if (fs.existsSync(envPath)) {
-    envContent = fs.readFileSync(envPath, 'utf8');
-  }
-  
-  // Update or add VITE_CONTRACT_ADDRESS
-  if (envContent.includes('VITE_CONTRACT_ADDRESS=')) {
-    envContent = envContent.replace(
-      /VITE_CONTRACT_ADDRESS=.*/,
-      `VITE_CONTRACT_ADDRESS=${contractAddress}`
-    );
-  } else {
-    envContent += `\nVITE_CONTRACT_ADDRESS=${contractAddress}\n`;
-  }
-  
-  fs.writeFileSync(envPath, envContent);
-  console.log("Environment file updated:", envPath);
-  
   console.log("\n✅ Deployment completed successfully!");
   console.log(`📋 Contract Address: ${contractAddress}`);
+  console.log(`👤 Admin Address: ${adminAddress}`);
   console.log(`🌍 Network: ${currentNetwork.name} (Chain ID: ${currentNetwork.chainId})`);
   console.log(`🔗 Block Explorer: ${currentNetwork.blockExplorer}/address/${contractAddress}`);
-  
-  } catch (error) {
-    console.error("Deployment failed:", error);
-    throw error;
-  }
 }
 
 main()

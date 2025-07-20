@@ -328,7 +328,6 @@ export const fetchAdminDashboardData = createAsyncThunk(
           try {
             const requestsData =
               await contractAny.getPendingVerificationRequests();
-            console.log("Verification requests data:", requestsData);
 
             if (
               requestsData &&
@@ -394,7 +393,6 @@ export const fetchAdminDashboardData = createAsyncThunk(
               console.log("Dashboard verification data:", dashboardData);
 
               if (dashboardData && dashboardData.length >= 4) {
-                // eslint-disable-next-line @typescript-eslint/no-unused-vars
                 const [recentRequests, recentNames, recentRoles] =
                   dashboardData;
 
@@ -500,15 +498,47 @@ export const selectCampaign = createAsyncThunk(
       signer,
       provider,
     }: { campaignId: number; signer: ethers.Signer; provider: ethers.Provider },
-    { dispatch }
+    { dispatch, rejectWithValue }
   ) => {
-    if (!provider) {
-      throw new Error("No provider available from signer");
-    }
+    try {
+      if (!provider) {
+        throw new Error("No provider available from signer");
+      }
 
-    // Fetch dashboard data for the selected campaign
-    await dispatch(fetchAdminDashboardData({ campaignId, signer }));
-    return campaignId;
+      if (!signer) {
+        throw new Error("Signer not available");
+      }
+
+      // Validate campaign exists and user has permission to view it
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        provider
+      );
+
+      const isValidContract = await validateContract(contract);
+      if (!isValidContract) {
+        return rejectWithValue("Contract not found or invalid");
+      }
+
+      // Check if campaign exists
+      try {
+        const campaignDetails = await contract.getCampaignDetails(campaignId);
+        if (campaignDetails.isDeleted) {
+          return rejectWithValue("Selected campaign has been deleted");
+        }
+      } catch {
+        return rejectWithValue("Campaign not found");
+      }
+
+      // Fetch dashboard data for the selected campaign
+      await dispatch(fetchAdminDashboardData({ campaignId, signer, forceRefresh: true }));
+      return campaignId;
+    } catch (error) {
+      console.error("Failed to select campaign:", error);
+      const errorMessage = handleContractError(error);
+      return rejectWithValue(errorMessage);
+    }
   }
 );
 
@@ -1030,5 +1060,74 @@ export const fetchVerificationRequests = createAsyncThunk(
       const errorMessage = handleContractError(error);
       return rejectWithValue(errorMessage);
     }
+  }
+);
+
+// Set public campaign for display
+export const setPublicCampaignForDisplay = createAsyncThunk(
+  "admin/setPublicCampaignForDisplay",
+  async (
+    { campaignId, signer }: { campaignId: number; signer: ethers.Signer },
+    { rejectWithValue }
+  ) => {
+    try {
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        signer
+      );
+
+      // Call the contract function to set the active campaign for public display
+      const tx = await contract.switchToCampaign(campaignId);
+      await tx.wait();
+
+      toast.success("Public campaign updated successfully!");
+      return campaignId;
+    } catch (error) {
+      console.error("Failed to set public campaign:", error);
+      const errorMessage = handleContractError(error);
+      toast.error(`Failed to set public campaign: ${errorMessage}`);
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+// Auto-select urgent campaign
+export const checkAndAutoSelectUrgentCampaign = createAsyncThunk(
+  "admin/checkAndAutoSelectUrgentCampaign",
+  async (_, { getState, dispatch }) => {
+    const state = getState() as { 
+      admin: { 
+        autoSelectUrgent: boolean; 
+        campaignList: Array<{
+          id: number;
+          status: number;
+          startDate?: number;
+        }>;
+      } 
+    };
+    
+    if (!state.admin.autoSelectUrgent) return null;
+    
+    const now = Math.floor(Date.now() / 1000);
+    const urgentThreshold = 2 * 60 * 60; // 2 hours
+    
+    // Find campaigns starting within 2 hours
+    const urgentCampaigns = state.admin.campaignList
+      .filter(campaign => {
+        const isUpcoming = campaign.status === 0; // Upcoming status
+        const timeUntilStart = campaign.startDate ? campaign.startDate - now : Infinity;
+        return isUpcoming && timeUntilStart > 0 && timeUntilStart <= urgentThreshold;
+      })
+      .sort((a, b) => (a.startDate || 0) - (b.startDate || 0)); // Sort by start date
+    
+    if (urgentCampaigns.length > 0) {
+      // Auto-select the most urgent campaign for public display
+      const urgentCampaignId = urgentCampaigns[0].id;
+      dispatch({ type: "admin/setPublicCampaign", payload: urgentCampaignId });
+      return urgentCampaignId;
+    }
+    
+    return null;
   }
 );

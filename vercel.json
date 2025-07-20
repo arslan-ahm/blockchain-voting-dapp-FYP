@@ -1,0 +1,26 @@
+{
+  "version": 2,
+  "name": "blockchain-voting-dapp",
+  "buildCommand": "cd frontend && bun run build",
+  "outputDirectory": "frontend/dist",
+  "installCommand": "cd frontend && bun install",
+  "framework": "vite",
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/dist/index.html"
+    }
+  ],
+  "env": {
+    "VITE_NODE_ENV": "production",
+    "VITE_NETWORK_NAME": "sepolia",
+    "VITE_CHAIN_ID": "11155111",
+    "VITE_APP_NAME": "Blockchain Voting DApp",
+    "VITE_APP_VERSION": "1.0.0"
+  },
+  "build": {
+    "env": {
+      "VITE_NODE_ENV": "production"
+    }
+  }
+}

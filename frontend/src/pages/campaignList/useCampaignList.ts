@@ -7,10 +7,12 @@ import {
   getAllCandidateVotes,
   registerForCampaign,
   getCampaignParticipants,
-  castVote
+  castVoteWithRoleCheck
 } from "../../store/thunks/campaignThunks";
 import { resetVoteStatus, clearError } from "../../store/slices/campaignSlice";
+import { selectPublicCampaignId, selectPublicCampaign } from "../../store/slices/adminSlice";
 import { useWallet } from "../../hooks/useWallet";
+import { Role } from "../../types";
 
 interface UseCampaignListProps {
   userAddress?: string;
@@ -42,6 +44,27 @@ export const useCampaignList = ({
     campaignParticipants,
     fetchingParticipants 
   } = useAppSelector((state) => state.campaign);
+
+  // Get user's global role for enhanced voting logic
+  const userRole = useAppSelector((state) => state.user.role);
+  
+  // Get admin-selected public campaign
+  const publicCampaignId = useAppSelector(selectPublicCampaignId);
+  const publicCampaign = useAppSelector(selectPublicCampaign);
+
+  // Filter campaigns based on admin selection
+  const getDisplayCampaigns = useCallback(() => {
+    if (publicCampaignId && publicCampaign) {
+      // If admin has selected a specific campaign for public display, show only that one
+      const publicCampaignDetails = nearbyCampaigns.find(c => c.id === publicCampaignId);
+      return publicCampaignDetails ? [publicCampaignDetails] : nearbyCampaigns;
+    }
+    // Otherwise, show all nearby campaigns
+    return nearbyCampaigns;
+  }, [nearbyCampaigns, publicCampaignId, publicCampaign]);
+
+  // Get the campaigns to display
+  const displayCampaigns = getDisplayCampaigns();
 
   // Fetch nearby campaigns
   const fetchCampaigns = useCallback(() => {
@@ -95,16 +118,18 @@ export const useCampaignList = ({
     return participants?.voters || [];
   }, [campaignParticipants]);
 
-  // Cast vote for candidate
+  // Cast vote for candidate with enhanced role checking
   const voteForCandidate = useCallback(async (campaignId: number, candidateAddress: string) => {
     if (!userAddress) throw new Error("User address is required");
     if (!signer) throw new Error("Signer not connected");
     
     try {
-      const result = await dispatch(castVote({
+      // Use enhanced voting with role check and auto-registration
+      const result = await dispatch(castVoteWithRoleCheck({
         campaignId,
         candidate: candidateAddress,
-        signer
+        signer,
+        userAddress
       })).unwrap();
       
       // Refresh campaign data after successful vote
@@ -184,6 +209,15 @@ export const useCampaignList = ({
     fetchCampaigns();
   }, [fetchCampaigns]);
 
+  // Refresh campaign participants when campaigns are loaded or user role changes
+  useEffect(() => {
+    if (displayCampaigns.length > 0 && provider) {
+      displayCampaigns.forEach(campaign => {
+        fetchCampaignDetails(campaign.id);
+      });
+    }
+  }, [displayCampaigns, provider, userRole, fetchCampaignDetails]);
+
   // Fetch detailed data for all nearby campaigns - FIXED: Only run when provider is available
   useEffect(() => {
     if (!provider || nearbyCampaigns.length === 0) return;
@@ -217,26 +251,64 @@ export const useCampaignList = ({
     getCampaignStatus(campaign) === 'ended'
   );
 
-  // Get user's voting status for a campaign
+  // Get user's voting status for a campaign with enhanced role-based logic
   const getUserVotingStatus = useCallback((campaignId: number) => {
     const registration = getUserRegistration(campaignId);
     const vote = getUserVote(campaignId);
     const campaign = nearbyCampaigns.find(c => c.id === campaignId);
     const status = campaign ? getCampaignStatus(campaign) : 'ended';
     
+    // Enhanced voting permissions based on role
+    const hasVoterRole = userRole === Role.Voter;
+    const hasCandidateRole = userRole === Role.Candidate;
+    const isAdminRole = userRole === Role.Admin;
+    const isVerifiedUser = hasVoterRole || hasCandidateRole || isAdminRole;
+    
+    // Admin users cannot vote but should not see registration messages
+    if (isAdminRole) {
+      return {
+        canVote: false,
+        hasVoted: false,
+        votedFor: null,
+        isRegistered: true, // Admins are always "registered" 
+        isCandidate: false,
+        isVoter: false,
+        hasVerifiedRole: true,
+        userRole: userRole,
+        requiresVerification: false,
+        isPendingVerification: false,
+        isAdmin: true
+      };
+    }
+    
+    // Primary voting logic: Verified voters can vote during active campaigns
+    // No need for explicit campaign registration - system handles auto-registration
+    const canVoteBasedOnRole = hasVoterRole && status === 'active' && !vote?.votedCandidate;
+    
+    // Legacy registration-based voting (for backwards compatibility)
+    const canVoteBasedOnRegistration = registration?.isVoter && !vote?.votedCandidate && status === 'active';
+    
+    // Verified voters should always be able to vote during active campaigns
+    const finalCanVote = canVoteBasedOnRole || canVoteBasedOnRegistration;
+    
     return {
-      canVote: registration?.isVoter && !vote?.votedCandidate && status === 'active',
+      canVote: finalCanVote,
       hasVoted: !!vote?.votedCandidate,
       votedFor: vote?.votedCandidate,
-      isRegistered: !!registration,
-      isCandidate: !!registration?.isCandidate,
-      isVoter: !!registration?.isVoter
+      isRegistered: !!registration || hasVoterRole, // Consider verified voters as "registered"
+      isCandidate: !!registration?.isCandidate || hasCandidateRole,
+      isVoter: !!registration?.isVoter || hasVoterRole,
+      hasVerifiedRole: isVerifiedUser,
+      userRole: userRole,
+      requiresVerification: !isVerifiedUser && userRole === Role.Unverified,
+      isPendingVerification: userRole === Role.PendingVerification,
+      isAdmin: false
     };
-  }, [getUserRegistration, getUserVote, nearbyCampaigns, getCampaignStatus]);
+  }, [getUserRegistration, getUserVote, nearbyCampaigns, getCampaignStatus, userRole]);
 
   return {
     // Data
-    campaigns: nearbyCampaigns,
+    campaigns: displayCampaigns,
     activeCampaigns,
     upcomingCampaigns,
     endedCampaigns,
@@ -246,6 +318,8 @@ export const useCampaignList = ({
     userRegistrations,
     userVotes,
     campaignParticipants,
+    publicCampaignId,
+    publicCampaign,
     
     // Loading states
     loading: fetchingNearbyCampaigns,

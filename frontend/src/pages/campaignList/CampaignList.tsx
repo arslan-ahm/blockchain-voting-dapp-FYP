@@ -5,6 +5,7 @@ import {
   Vote,
   Bookmark,
   CheckCircle,
+  Clock10,
 } from "lucide-react";
 import {
   Card,
@@ -19,11 +20,14 @@ import { formatAddress } from "../../utils/formatters";
 import { EmptyState } from "../../components/admin/EmptyState";
 import { useCampaignList } from "./useCampaignList";
 import VotingCard from "../../components/VotingCard";
+import CountdownTimer from "../../components/CountdownTimer";
 import { getCampaignStatusBadgeColor } from "../../utils/helpers";
 import { mapCampaignStatus } from "../../utils/helpers";
 import { cn } from "../../utils/cn";
 import { useAppSelector } from "../../hooks/useRedux";
+import { useWallet } from "../../hooks/useWallet";
 import { Role } from "../../types";
+import { getTimeUrgencyLevel, getUrgencyColors } from "../../utils/timeUrgency";
 
 interface CampaignListProps {
   userAddress?: string;
@@ -42,8 +46,14 @@ interface ExtendedVoter {
 }
 
 export const CampaignList = ({ userAddress }: CampaignListProps) => {
+  // Get wallet connection for user address
+  const { account } = useWallet();
+  
+  // Use wallet account if userAddress prop is not provided
+  const effectiveUserAddress = userAddress || account || undefined;
+  
   const {
-    campaigns: nearbyCampaigns,
+    campaigns,
     loading: fetchingNearbyCampaigns,
     error,
     getCampaignCandidates,
@@ -52,18 +62,22 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
     handleVoteSubmission,
     getCampaignStatus,
     castingVote,
-  } = useCampaignList({ userAddress });
+    publicCampaignId,
+  } = useCampaignList({ userAddress: effectiveUserAddress });
 
   // Get current user role from Redux store
   const userRole = useAppSelector((state) => state.user.role);
   const isAdmin = userRole === Role.Admin;
+
+  // Since we now show only one campaign, get the first (and only) campaign
+  const campaign = campaigns[0];
 
   if (fetchingNearbyCampaigns) {
     return (
       <div className="container mx-auto py-12">
         <div className="text-center text-gray-400 py-12">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-400 mx-auto mb-4"></div>
-          Loading nearby campaign...
+          Loading campaign...
         </div>
       </div>
     );
@@ -76,7 +90,7 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
           <CardContent>
             <EmptyState
               icon={MapPin}
-              title="Error Loading Campaigns"
+              title="Error Loading Campaign"
               description={error}
             />
           </CardContent>
@@ -85,15 +99,36 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
     );
   }
 
-  if (nearbyCampaigns.length === 0) {
+  // Check if wallet is connected
+  if (!effectiveUserAddress) {
+    return (
+      <div className="container mx-auto py-12">
+        <Card className="bg-gray-800 border-gray-700">
+          <CardContent>
+            <EmptyState
+              icon={Vote}
+              title="Wallet Not Connected"
+              description="Please connect your wallet to view and participate in campaigns."
+            />
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!campaign) {
     return (
       <div className="container mx-auto py-12">
         <Card className="bg-gray-800 border-gray-700">
           <CardContent>
             <EmptyState
               icon={MapPin}
-              title="No Nearby Campaigns"
-              description="There are currently no campaigns in your area. Check back later or create a new campaign."
+              title="No Campaign Available"
+              description={
+                isAdmin 
+                  ? "No campaign has been selected for public display. Please select a campaign from the admin dashboard."
+                  : "No campaign is currently available for voting. Please check back later."
+              }
             />
           </CardContent>
         </Card>
@@ -106,17 +141,27 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
       <div className="container mx-auto py-12 space-y-8">
         <div className="text-center mb-8">
           <h2 className="text-3xl font-bold text-blue-400">
-            Nearby Campaign{isAdmin ? " (Admin View)" : ""}
+            Current Campaign{isAdmin ? " (Admin View)" : ""}
           </h2>
           {isAdmin && (
             <p className="text-sm text-gray-400 mt-2">
               You are viewing this as an administrator - voters section is visible to you only
             </p>
           )}
+          {publicCampaignId && (
+            <p className="text-sm text-blue-300 mt-2">
+              Campaign ID: #{publicCampaignId} (Selected for Public Display)
+            </p>
+          )}
         </div>
 
-        {nearbyCampaigns.map((campaign) => {
+        {(() => {
           const statusInfo = getCampaignStatus(campaign);
+          
+          // Get dynamic urgency colors for upcoming campaigns
+          const urgencyLevel = statusInfo === "upcoming" ? getTimeUrgencyLevel(campaign.startDate) : 'normal';
+          const urgencyColors = getUrgencyColors(urgencyLevel);
+          
           return (
             <Card
               key={campaign.id?.toString()}
@@ -152,12 +197,26 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
                         <Vote className="h-4 w-4 text-blue-400" />
                         <span>{campaign.totalVotes} votes cast</span>
                       </div>
+                      {/* Simple countdown for upcoming campaigns */}
+                      {statusInfo === "upcoming" && (
+                        <div className="flex items-center gap-2">
+                          <span className={`flex items-center flex-no-wrap gap-1.5 ${urgencyColors.text}`}>
+                            <Clock10 className="h-4 w-4" /> Starts in:
+                          </span>
+                          <CountdownTimer
+                            targetDate={campaign.startDate}
+                            variant="compact"
+                          />
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <Badge className={cn("select-none", getCampaignStatusBadgeColor(mapCampaignStatus(statusInfo)))}>
-                    {statusInfo.toUpperCase()}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-2">
+                    <Badge className={cn("select-none", getCampaignStatusBadgeColor(mapCampaignStatus(statusInfo)))}>
+                      {statusInfo.toUpperCase()}
+                    </Badge>
+                  </div>
                 </div>
               </CardHeader>
 
@@ -268,27 +327,27 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
                                       {formatAddress(voter.address)}
                                     </p>
                                   </div>
-                                  
+
                                   {/* Voting Status Badges */}
                                   <div className="flex flex-wrap gap-2 justify-center">
-                                    <Badge 
-                                      variant="outline" 
+                                    <Badge
+                                      variant="outline"
                                       className="border-blue-400 text-blue-300 bg-blue-500/10 px-3 py-1 text-xs font-medium"
                                     >
                                       <Users className="w-3 h-3 mr-1" />
                                       Voter
                                     </Badge>
                                     {voter.hasVoted ? (
-                                      <Badge 
-                                        variant="outline" 
+                                      <Badge
+                                        variant="outline"
                                         className="border-green-400 text-green-300 bg-green-500/10 px-3 py-1 text-xs font-medium"
                                       >
                                         <CheckCircle className="w-3 h-3 mr-1" />
                                         Voted
                                       </Badge>
                                     ) : (
-                                      <Badge 
-                                        variant="outline" 
+                                      <Badge
+                                        variant="outline"
                                         className="border-yellow-400 text-yellow-300 bg-yellow-500/10 px-3 py-1 text-xs font-medium animate-pulse"
                                       >
                                         <Vote className="w-3 h-3 mr-1" />
@@ -324,6 +383,14 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
                       <div>
                         <p className="text-sm text-gray-400">Your Status:</p>
                         <div className="flex items-center gap-2 mt-1">
+                          {getUserVotingStatus(campaign.id).hasVerifiedRole && (
+                            <Badge
+                              variant="outline"
+                              className="border-green-500 text-green-400"
+                            >
+                              {getUserVotingStatus(campaign.id).userRole === Role.Voter ? "Verified Voter" : "Verified Candidate"}
+                            </Badge>
+                          )}
                           {getUserVotingStatus(campaign.id).isVoter && (
                             <Badge
                               variant="outline"
@@ -348,18 +415,38 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
                               Voted
                             </Badge>
                           )}
-                          {!getUserVotingStatus(campaign.id).isRegistered && (
+                          {getUserVotingStatus(campaign.id).requiresVerification && (
                             <Badge
                               variant="outline"
-                              className="border-gray-500 text-gray-400"
+                              className="border-red-500 text-red-400"
                             >
-                              Not Registered
+                              Needs Verification
                             </Badge>
                           )}
+                          {getUserVotingStatus(campaign.id).isPendingVerification && (
+                            <Badge
+                              variant="outline"
+                              className="border-orange-500 text-orange-400"
+                            >
+                              Pending Verification
+                            </Badge>
+                          )}
+                          {!getUserVotingStatus(campaign.id).isRegistered &&
+                            !getUserVotingStatus(campaign.id).hasVerifiedRole &&
+                            !getUserVotingStatus(campaign.id).requiresVerification &&
+                            !getUserVotingStatus(campaign.id).isPendingVerification && (
+                              <Badge
+                                variant="outline"
+                                className="border-gray-500 text-gray-400"
+                              >
+                                Not Registered
+                              </Badge>
+                            )}
                         </div>
                       </div>
 
                       {!getUserVotingStatus(campaign.id).isRegistered &&
+                        !getUserVotingStatus(campaign.id).hasVerifiedRole &&
                         statusInfo !== "ended" && (
                           <Button variant="outline" size="sm">
                             Register for Campaign
@@ -371,7 +458,7 @@ export const CampaignList = ({ userAddress }: CampaignListProps) => {
               </CardContent>
             </Card>
           );
-        })}
+        })()}
       </div>
     </ErrorBoundary>
   );

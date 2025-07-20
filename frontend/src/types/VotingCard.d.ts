@@ -18,6 +18,11 @@ export interface VotingCardProps {
     isRegistered: boolean;
     isCandidate: boolean;
     isVoter: boolean;
+    hasVerifiedRole?: boolean;
+    userRole?: number;
+    requiresVerification?: boolean;
+    isPendingVerification?: boolean;
+    isAdmin?: boolean;
   };
   onVote: (
     campaignId: number,
