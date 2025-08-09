@@ -4,493 +4,594 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { useWallet } from "../../hooks/useWallet";
-import {
-  checkUpkeep,
-  createCampaign,
-  deleteCampaign,
-  fetchCampaigns,
-  manualCloseCampaign,
-  performUpkeep,
-} from "../../store/thunks/campaignThunks";
-import { fetchVerificationRequests, processVerification } from "../../store/thunks/verificationThunks";
-import { Role } from "../../types";
 import { usePinata } from "../../hooks/usePinata";
 import { toast } from "sonner";
 import { CAMPAIGN_RULES_TEMPLATE, PLACEHOLDERS } from "../../constants/editor";
 import html2pdf from "html2pdf.js";
 import {
-  selectCampaigns,
-  selectCampaignLoading,
+  fetchAdminDashboardData,
+  fetchAllCampaignIds,
+  adminCreateCampaign,
+  adminDeleteCampaign,
+  adminManualCloseCampaign,
+  adminProcessVerification,
+  fetchVerificationRequests,
+} from "../../store/thunks/adminThunks";
+
+import {
   selectCreatingCampaign,
   selectDeletingCampaign,
-  selectUpkeepData,
-  selectUpkeepLoading,
   selectAdminDashboard,
   selectAdminLoading,
   selectAdminError,
-  selectVerificationRequests,
-  selectVerificationLoading,
   selectProcessingVerification,
-  selectClosingCampaign
+  selectClosingCampaign,
+  selectCampaignList,
 } from "../../store/slices/adminSlice";
-import { fetchAdminDashboardData } from "../../store/thunks/adminThunks";
+import type {
+  ChartDataPoint,
+  LineChartDataPoint,
+} from "../../types/adminDashboard";
 
-const campaignSchema = z.object({
-  title: z.string().min(1, "Title is required"),
-  description: z.string().min(1, "Description is required"),
-  startDate: z.number().min(Math.floor(Date.now() / 1000), "Start date must be in the future"),
-  endDate: z.number(),
-  campaignDetails: z.string().min(1, "Campaign rules are required"),
-  campaignDocument: z.instanceof(File).optional(),
-  feedback: z.string().optional(),
-}).refine(
-  (data) => data.endDate > data.startDate,
-  { message: "End date must be after start date", path: ["endDate"] }
-);
+const campaignSchema = z
+  .object({
+    title: z.string().min(1, "Title is required"),
+    description: z.string().min(1, "Description is required"),
+    startDate: z
+      .number()
+      .min(Math.floor(Date.now() / 1000), "Start date must be in the future"),
+    endDate: z.number(),
+    campaignDetails: z.string().min(1, "Campaign rules are required"),
+    campaignDocument: z.instanceof(File).optional(),
+    feedback: z.string().optional(),
+  })
+  .refine((data) => data.endDate > data.startDate, {
+    message: "End date must be after start date",
+    path: ["endDate"],
+  });
 
 type CampaignFormData = z.infer<typeof campaignSchema>;
 
-interface ChartDataPoint {
-  name: string;
-  value: number;
-  color?: string;
-}
-
-interface LineChartDataPoint {
-  date: string;
-  campaigns: number;
-  participants: number;
-  votes: number;
-}
-
 export const useAdminDashboard = () => {
   const dispatch = useAppDispatch();
-  const { account, provider } = useWallet();
+  const { account, provider, signer } = useWallet();
 
-  const campaigns = useAppSelector(selectCampaigns);
-  const campaignLoading = useAppSelector(selectCampaignLoading);
+  // Global state selectors
+  const campaignList = useAppSelector(selectCampaignList);
+  const campaigns = campaignList.map((c) => ({
+    ...c,
+    title: `Campaign ${c.id}`,
+  }));
   const creatingCampaign = useAppSelector(selectCreatingCampaign);
   const deletingCampaign = useAppSelector(selectDeletingCampaign);
   const closingCampaign = useAppSelector(selectClosingCampaign);
-  const upkeepData = useAppSelector(selectUpkeepData);
-  const upkeepLoading = useAppSelector(selectUpkeepLoading);
+  const { verificationRequests } = useAppSelector((state) => ({
+    verificationRequests: state.admin.verificationRequests || [],
+  }));
+  const processingVerification = useAppSelector(selectProcessingVerification);
   const adminDashboard = useAppSelector(selectAdminDashboard);
   const adminLoading = useAppSelector(selectAdminLoading);
-  const adminError = useAppSelector(selectAdminError);
-  const verificationRequests = useAppSelector(selectVerificationRequests);
-  const verificationLoading = useAppSelector(selectVerificationLoading);
-  const processingVerification = useAppSelector(selectProcessingVerification);
+  useAppSelector(selectAdminError);
 
-  const { uploadFile } = usePinata();
-
-  const [isUploading, setIsUploading] = useState(false);
+  // Local state
   const [selectedCampaign, setSelectedCampaign] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<'all' | 'candidates' | 'voters'>('all');
+  const [isLoadingCampaignData, setIsLoadingCampaignData] = useState(false);
+  const [activeTab, setActiveTab] = useState<"all" | "candidates" | "voters">(
+    "all"
+  );
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [campaignToDelete, setCampaignToDelete] = useState<number | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { uploadFile } = usePinata();
 
   const campaignForm = useForm<CampaignFormData>({
     resolver: zodResolver(campaignSchema),
     defaultValues: {
       title: "",
       description: "",
-      startDate: Math.floor(Date.now() / 1000) + 86400, // Tomorrow
-      endDate: Math.floor(Date.now() / 1000) + 7 * 86400, // 7 days from now
+      startDate: Math.floor(Date.now() / 1000) + 86400,
+      endDate: Math.floor(Date.now() / 1000) + 7 * 86400,
       campaignDetails: CAMPAIGN_RULES_TEMPLATE,
-      campaignDocument: undefined,
-      feedback: "",
     },
   });
 
+  // Initial data fetch
   useEffect(() => {
-    dispatch(fetchCampaigns());
-    dispatch(fetchVerificationRequests());
-    dispatch(fetchAdminDashboardData());
-    dispatch(checkUpkeep());
-  }, [dispatch]);
+    if (provider) {
+      dispatch(fetchAllCampaignIds({ provider }));
+      if (signer) {
+        dispatch(fetchVerificationRequests({ signer }));
+      }
+    }
+  }, [dispatch, provider, signer]);
 
+  // Set default selected campaign
   useEffect(() => {
-    if (campaigns.length > 0 && !selectedCampaign) {
+    if (campaigns.length > 0 && selectedCampaign === null) {
       setSelectedCampaign(campaigns[0].id);
     }
   }, [campaigns, selectedCampaign]);
 
-  const replacePlaceholders = (content: string, startDate: number, endDate: number): string => {
-    const startDateFormatted = new Date(startDate * 1000).toLocaleDateString();
-    const endDateFormatted = new Date(endDate * 1000).toLocaleDateString();
-    return content
-      .replace(PLACEHOLDERS.START_DATE, startDateFormatted)
-      .replace(PLACEHOLDERS.END_DATE, endDateFormatted);
-  };
-
-  const handleUploadDocument = async (
-    content: string,
-    startDate: number,
-    endDate: number
-  ): Promise<string> => {
-    try {
-      setIsUploading(true);
-      const contentWithPlaceholders = replacePlaceholders(content, startDate, endDate);
-      const element = document.createElement("div");
-      element.innerHTML = contentWithPlaceholders;
-      const pdfBlob = await html2pdf()
-        .from(element)
-        .set({ margin: 10, filename: "campaign_rules.pdf", jsPDF: { unit: "mm", format: "a4", orientation: "portrait" } })
-        .output("blob");
-      const pdfFile = new File([pdfBlob], "campaign_rules.pdf", { type: "application/pdf" });
-      const ipfsHash = await uploadFile(pdfFile);
-      return ipfsHash;
-    } catch (error) {
-      console.error("Failed to upload document:", error);
-      toast.error("Failed to upload document");
-      return "";
-    } finally {
-      setIsUploading(false);
+  // Fetch data for the selected campaign
+  useEffect(() => {
+    if (selectedCampaign !== null && signer && provider) {
+      setIsLoadingCampaignData(true);
+      dispatch(
+        fetchAdminDashboardData({ campaignId: selectedCampaign, signer })
+      ).finally(() => {
+        setIsLoadingCampaignData(false);
+      });
     }
-  };
-  const onCreateCampaign = async (values: CampaignFormData) => {
-    try {
-      // Enhanced wallet connection validation
-      if (!account || !provider) {
-        toast.error("Please connect your wallet first");
-        return;
-      }
-  
-      // Additional validation to ensure admin role
-      if (!account.toLowerCase().includes('0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266'.toLowerCase())) {
-        toast.error("Only admin can create campaigns");
-        return;
-      }
-  
-      // Validate dates first
-      const now = Math.floor(Date.now() / 1000);
-      if (values.startDate <= now) {
-        toast.error("Campaign start date must be in the future");
-        return;
-      }
-  
-      if (values.endDate <= values.startDate) {
-        toast.error("Campaign end date must be after start date");
-        return;
-      }
-  
-      // Upload document to IPFS
-      let detailsIpfsHash = "";
-  
-      try {
-        if (values.campaignDocument) {
-          detailsIpfsHash = await uploadFile(values.campaignDocument);
-        } else {
-          detailsIpfsHash = await handleUploadDocument(
-            values.campaignDetails,
-            values.startDate,
-            values.endDate
-          );
-        }
-      } catch (uploadError) {
-        console.error("Failed to upload campaign document:", uploadError);
-        toast.error("Failed to upload campaign document");
-        return;
-      }
-  
-      if (!detailsIpfsHash) {
-        toast.error("Failed to upload campaign document");
-        return;
-      }
-  
-      // Dispatch with explicit account parameter
-      await dispatch(createCampaign({
-        title: values.title,
-        description: values.description,
-        startDate: values.startDate,
-        endDate: values.endDate,
-        campaignDetailsIpfsHash: detailsIpfsHash,
-        account: account // Pass the connected account
-      })).unwrap();
-  
-      campaignForm.reset();
-      setShowCreateModal(false);
-  
-      try {
-        await Promise.all([
-          dispatch(fetchCampaigns()).unwrap(),
-          dispatch(fetchAdminDashboardData()).unwrap()
-        ]);
-      } catch (refreshError) {
-        console.warn("Some data refresh failed:", refreshError);
-      }
-  
-    } catch (error) {
-      console.error("Failed to create campaign:", error);
-  
-      if (error instanceof Error) {
-        if (error.message) {
-          if (!error.message.includes("Failed to create campaign")) {
-            toast.error(`Failed to create campaign: ${error.message}`);
-          }
-        }
-      } else {
-        toast.error("Failed to create campaign. Please try again.");
-      }
-    }
+  }, [selectedCampaign, dispatch, signer, provider]);
+
+  // Calculate dashboard stats
+  const calculateDashboardStats = () => {
+    const totalCampaigns = campaignList.length;
+    const activeCampaigns = campaignList.filter((c) => c.status === 1).length;
+    const completedCampaigns = campaignList.filter(
+      (c) => c.status === 2
+    ).length;
+    const upcomingCampaigns = campaignList.filter((c) => c.status === 0).length;
+    const totalParticipants =
+      (adminDashboard?.participantStats.candidateCount ?? 0) +
+      (adminDashboard?.participantStats.voterCount ?? 0);
+    const totalVotes = adminDashboard?.voteStats.votedCount ?? 0;
+    const pendingVerifications = verificationRequests.filter(
+      (r) => r.status === 0
+    ).length;
+    const totalVoters = adminDashboard?.voteStats.totalVoters ?? 0;
+    const votePercentage =
+      totalVoters > 0 ? Math.round((totalVotes / totalVoters) * 100) : 0;
+
+    return {
+      totalCampaigns,
+      activeCampaigns,
+      completedCampaigns,
+      upcomingCampaigns,
+      totalParticipants,
+      totalVotes,
+      pendingVerifications,
+      totalVoters,
+      votePercentage,
+    };
   };
 
-  const handleDeleteCampaign = async (campaignId: number, account: string) => {
-    try {
-      await dispatch(deleteCampaign({
-        campaignId,
-        adminAddress: account
-      })).unwrap();
-      toast.success("Campaign deleted successfully");
-
-      if (selectedCampaign === campaignId) {
-        setSelectedCampaign(null);
-      }
-
-      dispatch(fetchCampaigns());
-      dispatch(fetchAdminDashboardData());
-    } catch (error) {
-      console.error("Failed to delete campaign:", error);
-      toast.error("Failed to delete campaign");
-    } finally {
-      setShowDeleteModal(false);
-      setCampaignToDelete(null);
-    }
-  };
-
-  const handleCloseCampaign = async (campaignId: number) => {
-    try {
-      await dispatch(manualCloseCampaign(campaignId)).unwrap();
-      toast.success("Campaign closed successfully");
-
-      dispatch(fetchCampaigns());
-      dispatch(fetchAdminDashboardData());
-    } catch (error) {
-      console.error("Failed to close campaign:", error);
-      toast.error("Failed to close campaign");
-    }
-  };
-
-  // Verification management
-  const handleProcessVerification = async (userAddress: string, approved: boolean, feedback: string = "") => {
-    try {
-      await dispatch(processVerification({ userAddress, approved, feedback })).unwrap();
-      toast.success(`Verification request ${approved ? 'approved' : 'rejected'} successfully`);
-
-      dispatch(fetchVerificationRequests());
-      dispatch(fetchAdminDashboardData());
-    } catch (error) {
-      console.error("Failed to process verification:", error);
-      toast.error("Failed to process verification request");
-    }
-  };
-
-  // Upkeep management
-  const handlePerformUpkeep = async () => {
-    if (!upkeepData?.upkeepNeeded) {
-      toast.info("No upkeep needed at this time");
-      return;
-    }
-    try {
-      await dispatch(performUpkeep(upkeepData.campaignId.toString())).unwrap();
-      toast.success("Campaign upkeep performed successfully");
-
-      dispatch(fetchCampaigns());
-      dispatch(fetchAdminDashboardData());
-      dispatch(checkUpkeep());
-    } catch (error) {
-      console.error("Failed to perform upkeep:", error);
-      toast.error("Failed to perform upkeep");
-    }
-  };
-
-  const openCreateModal = () => setShowCreateModal(true);
-  const closeCreateModal = () => {
-    setShowCreateModal(false);
-    campaignForm.reset();
-  };
-
-  const openDeleteModal = (campaignId: number) => {
-    setCampaignToDelete(campaignId);
-    setShowDeleteModal(true);
-  };
-
-  const closeDeleteModal = () => {
-    setShowDeleteModal(false);
-    setCampaignToDelete(null);
-  };
-
-  const getCurrentCampaign = () => {
-    return adminDashboard?.currentCampaign || campaigns.find(c => c.id === selectedCampaign);
-  };
-
-  const getParticipantChartData = (): ChartDataPoint[] => {
-    const current = getCurrentCampaign();
-    if (!current || !adminDashboard?.participantStats) {
-      return [];
-    }
+  // Calculate participant chart data
+  const calculateParticipantChartData = (): ChartDataPoint[] => {
+    const candidates = adminDashboard?.candidates ?? [];
+    const voters = adminDashboard?.voters ?? [];
 
     return [
       {
         name: "Candidates",
-        value: adminDashboard.participantStats.candidateCount,
-        color: "#8884d8"
+        value: candidates.length,
+        color: "#8884d8",
+        percentage: Math.round(
+          (candidates.length / (candidates.length + voters.length || 1)) * 100
+        ),
       },
       {
         name: "Voters",
-        value: adminDashboard.participantStats.voterCount,
-        color: "#82ca9d"
-      }
+        value: voters.length,
+        color: "#82ca9d",
+        percentage: Math.round(
+          (voters.length / (candidates.length + voters.length || 1)) * 100
+        ),
+      },
     ];
   };
 
-  const getVoteStatusChartData = (): ChartDataPoint[] => {
-    if (!adminDashboard?.voteStats) {
-      return [];
-    }
+  // Calculate vote status chart data
+  const calculateVoteStatusChartData = (): ChartDataPoint[] => {
+    const votedCount = adminDashboard?.voteStats.votedCount ?? 0;
+    const notVotedCount = adminDashboard?.voteStats.notVotedCount ?? 0;
+    const totalVoters = votedCount + notVotedCount;
 
     return [
       {
         name: "Voted",
-        value: adminDashboard.voteStats.votedCount,
-        color: "#00C49F"
+        value: votedCount,
+        color: "#00C49F",
+        percentage:
+          totalVoters > 0 ? Math.round((votedCount / totalVoters) * 100) : 0,
       },
       {
         name: "Not Voted",
-        value: adminDashboard.voteStats.notVotedCount,
-        color: "#FF8042"
-      }
+        value: notVotedCount,
+        color: "#FF8042",
+        percentage:
+          totalVoters > 0 ? Math.round((notVotedCount / totalVoters) * 100) : 0,
+      },
     ];
   };
 
-  const getLineChartData = (): LineChartDataPoint[] => {
-    if (!adminDashboard?.monthlyCampaigns) {
-      return [];
-    }
-
-    const { campaignIds, startDates } = adminDashboard.monthlyCampaigns;
-
+  // Calculate line chart data for campaigns over time
+  const calculateLineChartData = (): LineChartDataPoint[] => {
     const monthlyData: { [key: string]: LineChartDataPoint } = {};
 
-    campaignIds.forEach((_, index) => {
-      const date = new Date(startDates[index] * 1000);
-      const monthKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    campaignList.forEach((campaign) => {
+      const date = new Date((campaign.startDate ?? 0) * 1000);
+      const monthKey = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}`;
 
       if (!monthlyData[monthKey]) {
         monthlyData[monthKey] = {
           date: monthKey,
           campaigns: 0,
           participants: 0,
-          votes: 0
-        };
+          votes: 0,
+          active: 0,
+          completed: 0,
+        } as LineChartDataPoint;
       }
 
-      monthlyData[monthKey].campaigns += 1;
+      const currentData = monthlyData[monthKey];
+      currentData.campaigns++;
+
+      // Add status-based counting
+      if (campaign.status === 1) {
+        currentData.active = (currentData.active || 0) + 1;
+      } else if (campaign.status === 2) {
+        currentData.completed = (currentData.completed || 0) + 1;
+      }
     });
 
-    return Object.values(monthlyData).sort((a, b) => a.date.localeCompare(b.date));
+    // Add participant and vote data for each month
+    Object.keys(monthlyData).forEach((monthKey) => {
+      // For now, we'll use current dashboard data
+      // In a real implementation, you'd want historical data
+      if (adminDashboard) {
+        monthlyData[monthKey].participants =
+          adminDashboard.participantStats.candidateCount +
+          adminDashboard.participantStats.voterCount;
+        monthlyData[monthKey].votes = adminDashboard.voteStats.votedCount;
+      }
+    });
+
+    return Object.values(monthlyData).sort((a, b) =>
+      a.date.localeCompare(b.date)
+    );
   };
 
-  const campaignStats = campaigns.map((campaign) => ({
-    campaignId: campaign.id,
-    voters: campaign.voters?.length || 0,
-    candidates: campaign.candidates?.length || 0,
-    isOpen: campaign.isOpen,
-    winner: campaign.winner,
-    title: `Campaign ${campaign.id}`,
-    startDate: campaign.startDate,
-    endDate: campaign.endDate
-  }));
+  // Calculate candidate performance chart data
+  const calculateCandidatePerformanceData = (): ChartDataPoint[] => {
+    const candidates = adminDashboard?.candidates ?? [];
+    const totalVotes = candidates.reduce(
+      (sum, candidate) => sum + candidate.voteCount,
+      0
+    );
 
-  const roleRequestStats = {
-    all: verificationRequests.length,
-    candidates: verificationRequests.filter((r) => r.requestedRole === Role.Candidate).length,
-    voters: verificationRequests.filter((r) => r.requestedRole === Role.Voter).length,
+    return candidates.map((candidate, index) => ({
+      name: candidate.name || `Candidate ${index + 1}`,
+      value: candidate.voteCount,
+      color: `hsl(${(index * 45) % 360}, 70%, 60%)`,
+      percentage:
+        totalVotes > 0
+          ? Math.round((candidate.voteCount / totalVotes) * 100)
+          : 0,
+      address: candidate.address,
+    }));
   };
 
-  const dashboardStats = {
-    totalCampaigns: adminDashboard?.totalCampaigns || campaigns.length,
-    activeCampaigns: adminDashboard?.activeCampaigns || campaigns.filter(c => c.isOpen).length,
-    completedCampaigns: adminDashboard?.completedCampaigns || campaigns.filter(c => !c.isOpen).length,
-    totalParticipants: (adminDashboard?.participantStats?.candidateCount || 0) + (adminDashboard?.participantStats?.voterCount || 0),
-    totalVotes: adminDashboard?.voteStats?.votedCount || 0,
-    pendingVerifications: verificationRequests.length
+  // Calculate campaign status distribution
+  const calculateCampaignStatusData = (): ChartDataPoint[] => {
+    const statusCounts = campaignList.reduce(
+      (acc, campaign) => {
+        switch (campaign.status) {
+          case 0:
+            acc.upcoming++;
+            break;
+          case 1:
+            acc.active++;
+            break;
+          case 2:
+            acc.completed++;
+            break;
+          default:
+            acc.other++;
+        }
+        return acc;
+      },
+      { upcoming: 0, active: 0, completed: 0, other: 0 }
+    );
+
+    return [
+      {
+        name: "Upcoming",
+        value: statusCounts.upcoming,
+        color: "#FFA500",
+        percentage: Math.round(
+          (statusCounts.upcoming / campaignList.length) * 100
+        ),
+      },
+      {
+        name: "Active",
+        value: statusCounts.active,
+        color: "#00C49F",
+        percentage: Math.round(
+          (statusCounts.active / campaignList.length) * 100
+        ),
+      },
+      {
+        name: "Completed",
+        value: statusCounts.completed,
+        color: "#8884d8",
+        percentage: Math.round(
+          (statusCounts.completed / campaignList.length) * 100
+        ),
+      },
+      {
+        name: "Other",
+        value: statusCounts.other,
+        color: "#FF8042",
+        percentage: Math.round(
+          (statusCounts.other / campaignList.length) * 100
+        ),
+      },
+    ].filter((item) => item.value > 0);
   };
 
-  const getFilteredParticipants = () => {
-    if (!adminDashboard) return { candidates: [], voters: [] };
+  // Calculate verification requests chart data
+  const calculateVerificationRequestsData = (): ChartDataPoint[] => {
+    const requestCounts = verificationRequests.reduce(
+      (acc, request) => {
+        switch (request.status) {
+          case 0:
+            acc.pending++;
+            break;
+          case 1:
+            acc.approved++;
+            break;
+          case 2:
+            acc.rejected++;
+            break;
+          default:
+            acc.other++;
+        }
+        return acc;
+      },
+      { pending: 0, approved: 0, rejected: 0, other: 0 }
+    );
 
-    const { candidates = [], voters = [] } = adminDashboard;
+    return [
+      {
+        name: "Pending",
+        value: requestCounts.pending,
+        color: "#FFA500",
+        percentage: Math.round(
+          (requestCounts.pending / verificationRequests.length) * 100
+        ),
+      },
+      {
+        name: "Approved",
+        value: requestCounts.approved,
+        color: "#00C49F",
+        percentage: Math.round(
+          (requestCounts.approved / verificationRequests.length) * 100
+        ),
+      },
+      {
+        name: "Rejected",
+        value: requestCounts.rejected,
+        color: "#FF8042",
+        percentage: Math.round(
+          (requestCounts.rejected / verificationRequests.length) * 100
+        ),
+      },
+    ].filter((item) => item.value > 0);
+  };
 
-    switch (activeTab) {
-      case 'candidates':
-        return { candidates, voters: [] };
-      case 'voters':
-        return { candidates: [], voters };
-      default:
-        return { candidates, voters };
+  // Handlers
+  const handleSelectCampaign = (campaignId: number) => {
+    setSelectedCampaign(campaignId);
+  };
+
+  const handleUploadDocument: (
+    content: string | File,
+    startDate?: number,
+    endDate?: number
+  ) => Promise<string> = async (content, startDate, endDate) => {
+    setIsUploading(true);
+    try {
+      let fileToUpload: File;
+      
+      if (typeof content === 'string') {
+        // Handle rich text content
+        if (!startDate || !endDate) {
+          throw new Error("Start date and end date are required for text upload");
+        }
+        
+        const startDateFormatted = new Date(startDate * 1000).toLocaleDateString();
+        const endDateFormatted = new Date(endDate * 1000).toLocaleDateString();
+        const contentWithPlaceholders = content
+          .replace(PLACEHOLDERS.START_DATE, startDateFormatted)
+          .replace(PLACEHOLDERS.END_DATE, endDateFormatted);
+  
+        const element = document.createElement("div");
+        element.innerHTML = contentWithPlaceholders;
+        const pdfBlob = await html2pdf()
+          .from(element)
+          .set({
+            margin: 10,
+            filename: "campaign_rules.pdf",
+            jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+          })
+          .output("blob");
+  
+        fileToUpload = new File([pdfBlob], "campaign_rules.pdf", {
+          type: "application/pdf",
+        });
+      } else {
+        // Handle file upload directly
+        fileToUpload = content;
+      }
+  
+      const ipfsHash = await uploadFile(fileToUpload);
+  
+      if (!ipfsHash) {
+        throw new Error("IPFS upload returned empty hash");
+      }
+      
+      console.log("Document uploaded successfully. IPFS Hash:", ipfsHash);
+      toast.success("Document uploaded successfully");
+      return ipfsHash;
+    } catch (error) {
+      console.error("Failed to upload document:", error);
+      toast.error("Failed to upload document");
+      throw error;
+    } finally {
+      setIsUploading(false);
     }
   };
 
+  const handleCreateCampaign = async (values: CampaignFormData) => {
+    if (!signer || !account || !provider)
+      return toast.error("Please connect your wallet.");
+
+    let campaignDetailsIpfsHash = "";
+    if (values.campaignDetails || values.campaignDocument) {
+      const contentToUpload = values.campaignDocument || values.campaignDetails;
+      campaignDetailsIpfsHash = await handleUploadDocument(
+        contentToUpload,
+        values.startDate,
+        values.endDate
+      );
+      if (!campaignDetailsIpfsHash) return;
+    }
+
+    const campaignData = {
+      title: values.title,
+      description: values.description,
+      startDate: values.startDate,
+      endDate: values.endDate,
+      detailsIpfsHash: campaignDetailsIpfsHash,
+      signer,
+    };
+
+    console.log("Campaign data being sent:", campaignData);
+    console.log("IPFS Hash:", campaignDetailsIpfsHash);
+    await dispatch(adminCreateCampaign(campaignData)).unwrap();
+    toast.success("Campaign created successfully");
+    campaignForm.reset();
+    setShowCreateModal(false);
+    dispatch(fetchAllCampaignIds({ provider }));
+  };
+
+  const handleDeleteCampaign = async (campaignId: number) => {
+    if (!signer || !account || !provider)
+      return toast.error("Please connect your wallet.");
+
+    await dispatch(adminDeleteCampaign({ campaignId, signer })).unwrap();
+    toast.success("Campaign deleted successfully");
+    if (selectedCampaign === campaignId) {
+      setSelectedCampaign(
+        campaigns.length > 1
+          ? campaigns.find((c) => c.id !== campaignId)?.id ?? null
+          : null
+      );
+    }
+    dispatch(fetchAllCampaignIds({ provider }));
+    setShowDeleteModal(false);
+    setCampaignToDelete(null);
+  };
+
+  const handleCloseCampaign = async (campaignId: number) => {
+    if (!signer || !provider) return toast.error("Please connect your wallet.");
+    await dispatch(adminManualCloseCampaign({ campaignId, signer })).unwrap();
+    toast.success("Campaign closed successfully");
+    dispatch(fetchAllCampaignIds({ provider }));
+  };
+
+  const handleProcessVerification = async (
+    userAddress: string,
+    approved: boolean,
+    feedback: string
+  ): Promise<void> => {
+    if (!signer) {
+      toast.error("Please connect your wallet.");
+      return;
+    }
+    try {
+      await dispatch(
+        adminProcessVerification({ userAddress, approved, feedback, signer })
+      ).unwrap();
+      toast.success("Verification processed successfully");
+      dispatch(fetchVerificationRequests({ signer }));
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "An unknown error occurred.";
+      toast.error(`Verification failed: ${message}`);
+      console.error("Verification processing failed:", error);
+    }
+  };
+
+  // Data derivation for charts and stats
+  const selectedCampaignData = adminDashboard?.currentCampaign;
+  const candidates = adminDashboard?.candidates ?? [];
+  const voters = adminDashboard?.voters ?? [];
+
+  // Calculate all chart data
+  const dashboardStats = calculateDashboardStats();
+  const participantChartData = calculateParticipantChartData();
+  const voteStatusChartData = calculateVoteStatusChartData();
+  const lineChartData = calculateLineChartData();
+  const candidatePerformanceData = calculateCandidatePerformanceData();
+  const campaignStatusData = calculateCampaignStatusData();
+  const verificationRequestsData = calculateVerificationRequestsData();
+
+  const campaignStats = campaigns.map((c) => ({
+    ...c,
+    title: `Campaign ${c.id}`,
+  }));
+
   return {
-    campaigns,
+    // State & Data
+    campaigns: campaignStats,
+    selectedCampaign,
+    selectedCampaignData,
     verificationRequests,
     adminDashboard,
-    selectedCampaign,
-    currentCampaign: getCurrentCampaign(),
-
-    participantChartData: getParticipantChartData(),
-    voteStatusChartData: getVoteStatusChartData(),
-    lineChartData: getLineChartData(),
-
-    campaignStats,
-    roleRequestStats,
-    dashboardStats,
-    upkeepData,
-
-    filteredParticipants: getFilteredParticipants(),
-
-    campaignForm,
-
+    candidates,
+    voters,
     activeTab,
     showCreateModal,
     showDeleteModal,
     campaignToDelete,
-
-    isLoading: campaignLoading || adminLoading || verificationLoading,
+    campaignForm,
+    adminLoading,
+    isLoadingCampaignData,
     isUploading,
     creatingCampaign,
     deletingCampaign,
     closingCampaign,
-    upkeepLoading,
     processingVerification,
+    handleUploadDocument,
 
-    adminError,
+    // Dashboard Stats & Chart Data
+    dashboardStats,
+    participantChartData,
+    voteStatusChartData,
+    lineChartData,
+    candidatePerformanceData,
+    campaignStatusData,
+    verificationRequestsData,
 
-    isConnected: !!account && !!provider,
-    address: account,
-
-    onCreateCampaign,
+    // Handlers & Actions
+    handleSelectCampaign,
+    handleCreateCampaign,
     handleDeleteCampaign,
     handleCloseCampaign,
-    setSelectedCampaign,
-
     handleProcessVerification,
-
-    handlePerformUpkeep,
-
     setActiveTab,
-    openCreateModal,
-    closeCreateModal,
-    openDeleteModal,
-    closeDeleteModal,
-
-    refreshDashboard: () => {
-      dispatch(fetchCampaigns());
-      dispatch(fetchAdminDashboardData());
-      dispatch(fetchVerificationRequests());
-      dispatch(checkUpkeep());
-    }
+    openCreateModal: () => setShowCreateModal(true),
+    closeCreateModal: () => setShowCreateModal(false),
+    openDeleteModal: (id: number) => {
+      setCampaignToDelete(id);
+      setShowDeleteModal(true);
+    },
+    closeDeleteModal: () => setShowDeleteModal(false),
   };
 };

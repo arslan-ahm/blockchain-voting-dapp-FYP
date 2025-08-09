@@ -2,8 +2,9 @@ import { useHome } from "./useHome";
 import { Link } from "react-router-dom";
 import { Button } from "../../components/ui/button";
 import { Card, CardContent } from "../../components/ui/card";
-import { ArrowDown, ChevronRight, Vote } from "lucide-react";
-import { features, steps, roadmapItems } from "./home.constants";
+import { ArrowDown, ChevronRight } from "lucide-react";
+import { features, steps, roadmapItems } from "../../constants/home";
+import GradientText from "../../components/GradientText";
 
 export const Home = () => {
   const { 
@@ -22,12 +23,10 @@ export const Home = () => {
         <div className="container mx-auto text-center relative z-10">
           <h1 className="hero-title text-4xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
             Secure Voting on the <br />
-            <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Blockchain
-            </span>
+            <GradientText text="Blockchain" />
           </h1>
           
-          <p className="hero-description text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-8">
+          <p className="hero-description text-gray-400 text-sm min-[375px]:text-md sm:text-lg md:text-xl max-w-2xl mx-auto mb-8">
             Experience transparent, tamper-proof voting with our cutting-edge blockchain technology. 
             Your voice matters, make it count securely.
           </p>
@@ -99,19 +98,19 @@ export const Home = () => {
             <h2 className="section-title text-3xl md:text-4xl font-bold mb-6 text-white text-center">
               About <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">BlockVote</span>
             </h2>
-            <p className="section-description text-lg text-gray-300 mb-8 text-center">
+            <p className="section-description text-sm min-[375px]:text-md sm:text-lg md:text-xl text-gray-300 mb-8 text-center">
               BlockVote represents a revolutionary approach to digital democracy, leveraging the security and transparency of blockchain technology to create a voting platform that's immune to tampering, fraud, and manipulation.
             </p>
             <div className="grid md:grid-cols-2 gap-8">
               <div className="backdrop-blur-sm rounded-xl p-6 border border-purple-500/20 hover:scale-105 hover:shadow-neon-purple transition-all duration-300">
                 <h3 className="text-xl font-bold mb-4 text-purple-400">Our Mission</h3>
-                <p className="text-gray-300">
+                <p className="text-gray-300 text-sm min-[375px]:text-md sm:text-lg md:text-xl">
                   To democratize voting systems worldwide by providing a secure, transparent, and accessible platform that ensures every vote is counted accurately and cannot be manipulated.
                 </p>
               </div>
               <div className="backdrop-blur-sm rounded-xl p-6 border border-cyan-400/20 hover:scale-105 hover:shadow-neon-cyan transition-all duration-300">
                 <h3 className="text-xl font-bold mb-4 text-cyan-400">Why Blockchain?</h3>
-                <p className="text-gray-300">
+                <p className="text-gray-300 text-sm min-[375px]:text-md sm:text-lg md:text-xl">
                   Blockchain technology provides immutable records, decentralized verification, and cryptographic security, making it the perfect foundation for a next-generation voting system.
                 </p>
               </div>
@@ -126,7 +125,7 @@ export const Home = () => {
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white text-center">
             Platform <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Features</span>
           </h2>
-          <p className="text-lg text-gray-300 mb-12 text-center max-w-3xl mx-auto">
+          <p className="text-gray-300 mb-12 text-center max-w-3xl mx-auto text-sm min-[375px]:text-md sm:text-lg md:text-xl">
             BlockVote combines cutting-edge blockchain technology with a user-friendly interface to deliver a voting platform that's as secure as it is easy to use.
           </p>
           
@@ -157,20 +156,20 @@ export const Home = () => {
       <section id="how-it-works" className="py-20 md:py-28 relative">
         <div className="container px-4 md:px-8 mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white text-center">
-            How It <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Works</span>
+            How It <GradientText text="Works" />
           </h2>
-          <p className="text-lg text-gray-300 mb-16 text-center max-w-3xl mx-auto">
+          <p className="text-gray-300 mb-16 text-center max-w-3xl mx-auto text-sm min-[375px]:text-md sm:text-lg md:text-xl">
             Voting on the blockchain has never been easier. Follow these simple steps to cast your vote securely.
           </p>
           
           <div className="max-w-4xl mx-auto relative">
             {/* Timeline Line - Responsive */}
-            <div className="absolute left-8 md:left-1/2 md:transform md:-translate-x-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 via-purple-400 to-pink-400 shadow-neon-blue"></div>
+            <div className="absolute left-[46px] md:left-1/2 md:transform md:-translate-x-1/2 top-0 bottom-0 w-1 bg-gradient-to-b from-blue-400 via-purple-400 to-pink-400 shadow-neon-blue"></div>
             
             {steps.map((step, index) => (
               <div key={index} className={`step-card relative flex items-center mb-12 ${index % 2 === 0 ? 'md:flex-row' : 'md:flex-row-reverse'}`}>
                 {/* Timeline Node */}
-                <div className="absolute left-4 md:left-1/2 md:transform md:-translate-x-1/2 w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-4 border-background flex items-center justify-center text-white font-bold text-xl z-10 hover:scale-110 hover:shadow-neon-blue transition-all duration-300">
+                <div className="absolute left-4 md:left-1/2 md:transform md:-translate-x-1/2 w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full border-4 border-[#1b2432] flex items-center justify-center text-white font-bold text-xl z-10 hover:scale-110 hover:shadow-neon-blue transition-all duration-300">
                   {index + 1}
                 </div>
                 
@@ -183,8 +182,8 @@ export const Home = () => {
                           <step.icon className="h-6 w-6 text-blue-400" />
                         </div>
                       </div>
-                      <h3 className="text-xl font-bold mb-3 text-blue-400">{step.title}</h3>
-                      <p className="text-gray-300 leading-relaxed">{step.description}</p>
+                      <h3 className="text-md sm:text-lg md:text-xl lg:text-2xl font-bold mb-3 text-blue-400">{step.title}</h3>
+                      <p className="text-gray-300 leading-relaxed text-sm min-[375px]:text-md sm:text-lg lg:text-xl">{step.description}</p>
                       <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-blue-400 transition-colors duration-300">
                         View details <ChevronRight className="ml-1 h-4 w-4" />
                       </div>
@@ -225,7 +224,7 @@ export const Home = () => {
           <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white text-center">
             Project <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Roadmap</span>
           </h2>
-          <p className="text-lg text-gray-300 mb-16 text-center max-w-3xl mx-auto">
+          <p className="text-gray-300 mb-16 text-center max-w-3xl mx-auto text-sm min-[375px]:text-md sm:text-lg md:text-xl">
             Our development roadmap outlines our vision for the future of BlockVote and the key milestones we're working toward.
           </p>
           
@@ -233,8 +232,8 @@ export const Home = () => {
             {roadmapItems.map((item, index) => (
               <div 
                 key={index} 
-                className={`roadmap-item flex flex-col md:flex-row mb-12 ${
-                  index % 2 !== 0 ? 'md:flex-row-reverse' : ''
+                className={`roadmap-item flex flex-col-reverse gap-4 sm:flex-row mb-12 ${
+                  index % 2 !== 0 ? 'sm:flex-row-reverse' : ''
                 }`}
               >
                 <div className={`md:w-1/2 ${index % 2 !== 0 ? 'md:pl-8' : 'md:pr-8'} mb-4 md:mb-0`}>
@@ -243,8 +242,8 @@ export const Home = () => {
                       <div className="inline-block px-4 py-2 rounded-full text-xs font-medium bg-gradient-to-r from-blue-500/20 to-purple-500/20 border border-blue-500/30 text-blue-400 mb-4 group-hover:shadow-neon-blue transition-all duration-300">
                         {item.phase}
                       </div>
-                      <h3 className="text-xl font-bold mb-3 text-white">{item.title}</h3>
-                      <p className="text-gray-300 leading-relaxed">{item.description}</p>
+                      <h3 className="text-md sm:text-lg lg:text-xl font-bold mb-3 text-white">{item.title}</h3>
+                      <p className="text-gray-300 leading-relaxed text-sm min-[375px]:text-md sm:text-lg md:text-xl">{item.description}</p>
                       <div className="mt-4 flex items-center text-purple-400 text-sm font-medium group-hover:text-blue-400 transition-colors duration-300">
                         Learn more <ChevronRight className="ml-1 h-4 w-4" />
                       </div>
@@ -252,7 +251,7 @@ export const Home = () => {
                   </Card>
                 </div>
                 <div className="md:w-1/2 flex justify-center items-center">
-                  <div className="w-20 h-20 rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-2 border-blue-500/30 hover:scale-110 hover:shadow-neon-blue transition-all duration-300">
+                  <div className="w-28 h-28 sm:w-20 sm:h-20 rounded-full flex items-center justify-center bg-gradient-to-r from-blue-500/20 to-purple-500/20 border-2 border-blue-500/30 hover:scale-110 hover:shadow-neon-blue transition-all duration-300">
                     <item.icon className="h-10 w-10 text-blue-400" />
                   </div>
                 </div>
@@ -265,64 +264,6 @@ export const Home = () => {
         <div className="absolute top-1/3 left-10 w-80 h-80 bg-cyan-400/10 rounded-full blur-[120px]"></div>
         <div className="absolute bottom-1/4 right-10 w-64 h-64 bg-pink-500/10 rounded-full blur-[100px]"></div>
       </section>
-      
-      {/* Footer */}
-      <footer className="py-12 border-t border-gray-800">
-        <div className="container px-4 md:px-8 mx-auto">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="mb-6 md:mb-0">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full animate-pulse flex items-center justify-center">
-                  <Vote className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-xl font-bold text-white">
-                  Block<span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Vote</span>
-                </span>
-              </div>
-              <p className="text-gray-400 mt-2">Secure blockchain voting for everyone</p>
-            </div>
-            
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-12">
-              <div>
-                <h4 className="text-white font-medium mb-3">Platform</h4>
-                <ul className="space-y-2">
-                  <li><button onClick={() => handleScrollToSection('#features')} className="text-gray-400 hover:text-blue-400 transition-colors">Features</button></li>
-                  <li><button onClick={() => handleScrollToSection('#roadmap')} className="text-gray-400 hover:text-blue-400 transition-colors">Roadmap</button></li>
-                  <li><Link to="/campaigns" className="text-gray-400 hover:text-blue-400 transition-colors">Campaigns</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-white font-medium mb-3">Resources</h4>
-                <ul className="space-y-2">
-                  <li><Link to="/docs" className="text-gray-400 hover:text-blue-400 transition-colors">Documentation</Link></li>
-                  <li><Link to="/api" className="text-gray-400 hover:text-blue-400 transition-colors">API</Link></li>
-                  <li><Link to="/guides" className="text-gray-400 hover:text-blue-400 transition-colors">Guides</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-white font-medium mb-3">Company</h4>
-                <ul className="space-y-2">
-                  <li><button onClick={() => handleScrollToSection('#about')} className="text-gray-400 hover:text-blue-400 transition-colors">About</button></li>
-                  <li><Link to="/blog" className="text-gray-400 hover:text-blue-400 transition-colors">Blog</Link></li>
-                  <li><Link to="/careers" className="text-gray-400 hover:text-blue-400 transition-colors">Careers</Link></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="text-white font-medium mb-3">Legal</h4>
-                <ul className="space-y-2">
-                  <li><Link to="/privacy" className="text-gray-400 hover:text-blue-400 transition-colors">Privacy</Link></li>
-                  <li><Link to="/terms" className="text-gray-400 hover:text-blue-400 transition-colors">Terms</Link></li>
-                  <li><Link to="/cookies" className="text-gray-400 hover:text-blue-400 transition-colors">Cookies</Link></li>
-                </ul>
-              </div>
-            </div>
-          </div>
-          
-          <div className="border-t border-gray-800 mt-12 pt-8 text-center">
-            <p className="text-gray-500">© 2025 BlockVote. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };

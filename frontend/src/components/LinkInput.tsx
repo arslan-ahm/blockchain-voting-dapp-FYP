@@ -2,12 +2,8 @@ import { useState, useRef } from "react";
 import { X } from "lucide-react";
 import { cn } from "../utils/cn";
 import { getLinkDisplayName } from "../utils/formatters";
+import type { LinkInputProps } from "../types/linkinput";
 
-interface LinkInputProps {
-  value: string[];
-  onChange: (links: string[]) => void;
-  className?: string;
-}
 
 export const LinkInput = ({ value, onChange, className }: LinkInputProps) => {
   const [input, setInput] = useState("");

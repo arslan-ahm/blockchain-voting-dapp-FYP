@@ -2,25 +2,27 @@ import { createAsyncThunk } from "@reduxjs/toolkit";
 import { ethers } from "ethers";
 import { Role, RequestStatus } from "../../types";
 import { toast } from "sonner";
-import type { RootState } from "../store";
-import { VOTING_CONTRACT_ABI, VOTING_CONTRACT_ADDRESS } from "../../constants/contract";
+import {
+  VOTING_CONTRACT_ABI,
+  VOTING_CONTRACT_ADDRESS,
+} from "../../constants/contract";
 
-interface VerificationRequest {
+interface VerificationRequestPayload {
   role: Role;
   docIpfsHash: string;
+  signer: ethers.Signer;
 }
 
 export const requestVerification = createAsyncThunk(
   "user/requestVerification",
-  async (
-    { role, docIpfsHash }: VerificationRequest,
-    { getState }
-  ) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+  async ({ role, docIpfsHash, signer }: VerificationRequestPayload) => {
     if (!signer) throw new Error("Wallet not connected");
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.requestVerification(role, docIpfsHash);
@@ -36,25 +38,40 @@ export const requestVerification = createAsyncThunk(
 
 export const fetchVerificationRequests = createAsyncThunk(
   "verification/fetchVerificationRequests",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({ signer }: { signer: ethers.Signer }) => {
+    if (!signer) throw new Error("Admin wallet not connected");
+
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
-      const [userAddresses, requestedRoles, verificationDocIpfsHashes, adminFeedbacks] = 
-        await contract.getPendingVerificationRequests();
-      
+      // Get all the data returned by the smart contract function
+      const [
+        userAddresses,
+        requestedRoles,
+        verificationDocIpfsHashes,
+        adminFeedbacks,
+        userNames,
+        timestamps
+      ] = await contract.getPendingVerificationRequests();
+
+      // Map the returned data to the expected format
       const requests = userAddresses.map((address: string, index: number) => ({
         userAddress: address,
-        requestedRole: requestedRoles[index],
+        requestedRole: Number(requestedRoles[index]), // Convert BigInt to number
         status: RequestStatus.Pending,
         verificationDocIpfsHash: verificationDocIpfsHashes[index],
         adminFeedback: adminFeedbacks[index],
+        userName: userNames[index], // Include user name
+        requestTimestamp: Number(timestamps[index]) // Convert BigInt to number
       }));
-      
+
       return requests;
     } catch (error) {
+      console.error("Error fetching verification requests:", error);
       toast.error("Failed to fetch verification requests");
       throw error;
     }
@@ -63,22 +80,37 @@ export const fetchVerificationRequests = createAsyncThunk(
 
 export const processVerification = createAsyncThunk(
   "verification/processVerification",
-  async (
-    { userAddress, approved, feedback }: { userAddress: string; approved: boolean; feedback: string },
-    { getState }
-  ) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+  async ({
+    userAddress,
+    approved,
+    feedback,
+    signer,
+  }: {
+    userAddress: string;
+    approved: boolean;
+    feedback: string;
+    signer: ethers.Signer;
+  }) => {
     if (!signer) throw new Error("Wallet not connected");
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
-      const tx = await contract.processVerification(userAddress, approved, feedback);
+      // Remove the extra 'signer' parameter - the contract method only takes 3 parameters
+      const tx = await contract.processVerification(
+        userAddress,
+        approved,
+        feedback
+      );
       await tx.wait();
       toast.success(`Verification ${approved ? "approved" : "rejected"}`);
       return { userAddress };
     } catch (error) {
+      console.error("Error processing verification:", error);
       toast.error("Failed to process verification");
       throw error;
     }
@@ -97,7 +129,8 @@ export const updateUserDetails = createAsyncThunk(
       contactNumber,
       bio,
       profileImageIpfsHash,
-      supportiveLinks
+      supportiveLinks,
+      signer
     }: {
       name: string;
       email: string;
@@ -107,14 +140,16 @@ export const updateUserDetails = createAsyncThunk(
       bio: string;
       profileImageIpfsHash: string;
       supportiveLinks: string[];
-    },
-    { getState }
+      signer: ethers.Signer;
+    }
   ) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
     if (!signer) throw new Error("Wallet not connected");
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.updateUserDetails(
@@ -137,7 +172,7 @@ export const updateUserDetails = createAsyncThunk(
         contactNumber,
         bio,
         profileImageIpfsHash,
-        supportiveLinks
+        supportiveLinks,
       };
     } catch (error) {
       toast.error("Failed to update user details");
@@ -149,10 +184,14 @@ export const updateUserDetails = createAsyncThunk(
 // New thunk to check if user details are locked
 export const checkUserDetailsLocked = createAsyncThunk(
   "user/checkUserDetailsLocked",
-  async (userAddress: string, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({userAddress, provider}: {userAddress: string, provider: ethers.Provider}) => {
+    if (!provider) throw new Error("Wallet not connected");
+
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      provider
+    );
 
     try {
       const isLocked = await contract.isUserDetailsLocked(userAddress);
@@ -167,10 +206,14 @@ export const checkUserDetailsLocked = createAsyncThunk(
 // New thunk to get user details from contract
 export const fetchUserDetails = createAsyncThunk(
   "user/fetchUserDetails",
-  async (userAddress: string, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({userAddress, provider}: {userAddress: string, provider: ethers.Provider}) => {
+    if (!provider) throw new Error("Wallet not connected");
+
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      provider
+    );
 
     try {
       const userDetails = await contract.userDetails(userAddress);
@@ -183,7 +226,7 @@ export const fetchUserDetails = createAsyncThunk(
         contactNumber: userDetails.contactNumber,
         bio: userDetails.bio,
         profileImageIpfsHash: userDetails.profileImageIpfsHash,
-        supportiveLinks: userDetails.supportiveLinks
+        supportiveLinks: userDetails.supportiveLinks,
       };
     } catch (error) {
       toast.error("Failed to fetch user details");
@@ -195,10 +238,14 @@ export const fetchUserDetails = createAsyncThunk(
 // New thunk to get user role
 export const fetchUserRole = createAsyncThunk(
   "user/fetchUserRole",
-  async (userAddress: string, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({userAddress, provider}: {userAddress: string, provider: ethers.Provider}) => {
+    if (!provider) throw new Error("Wallet not connected");
+
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      provider
+    );
 
     try {
       const role = await contract.userRoles(userAddress);

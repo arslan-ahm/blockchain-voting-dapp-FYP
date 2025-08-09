@@ -7,10 +7,11 @@ import {
   fetchNearbyCampaigns,
   registerForCampaign 
 } from "../thunks/userThunks";
-import type { ethers } from "ethers";
 
 interface Campaign {
   id: number;
+  title: string;
+  description: string;
   startDate: number;
   endDate: number;
   winner: string;
@@ -20,7 +21,7 @@ interface Campaign {
   candidates: string[];
 }
 
-interface UserState {
+export interface UserState {
   account: string | null;
   details: UserDetails | null;
   role: Role;
@@ -28,8 +29,7 @@ interface UserState {
   error: string | null;
   providerConnected: boolean;
   signerConnected: boolean;
-  provider: ethers.Provider | null;
-  signer: ethers.Signer | null;
+  // REMOVED: provider and signer objects (not serializable)
   isDetailsLocked: boolean;
   nearbyCampaigns: Campaign[];
   campaignsLoading: boolean;
@@ -45,8 +45,7 @@ const initialState: UserState = {
   error: null,
   providerConnected: false,
   signerConnected: false,
-  provider: null,
-  signer: null,
+  // REMOVED: provider and signer initialization
   isDetailsLocked: false,
   nearbyCampaigns: [],
   campaignsLoading: false,
@@ -60,10 +59,9 @@ const userSlice = createSlice({
   reducers: {
     setUser(state, action) {
       state.account = action.payload.account;
-      state.provider = action.payload.provider;
-      state.signer = action.payload.signer;
-      state.providerConnected = !!action.payload.provider;
-      state.signerConnected = !!action.payload.signer;
+      // FIXED: Only store serializable connection status, not the objects themselves
+      state.providerConnected = action.payload.providerConnected;
+      state.signerConnected = action.payload.signerConnected;
       
       console.log('Redux user updated:', {
         account: state.account,
@@ -77,8 +75,7 @@ const userSlice = createSlice({
       state.role = Role.Unverified;
       state.providerConnected = false;
       state.signerConnected = false;
-      state.provider = null;
-      state.signer = null;
+      // REMOVED: provider and signer clearing
       state.isDetailsLocked = false;
       state.nearbyCampaigns = [];
       state.error = null;

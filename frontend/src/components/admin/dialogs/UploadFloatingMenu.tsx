@@ -1,12 +1,7 @@
 import { useRef } from 'react';
-import { Button } from '../../ui/button';
 import { Camera, FileText } from 'lucide-react';
-
-interface UploadFloatingMenuProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onUpload: (file: File) => void;
-}
+import { Button } from '../../ui/button';
+import type { UploadFloatingMenuProps } from '../../../types/dialog';
 
 export const UploadFloatingMenu = ({ 
   isOpen, 

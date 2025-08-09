@@ -1,21 +1,51 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { ethers } from "ethers";
-import { VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI } from "../../constants/contract";
+import {
+  VOTING_CONTRACT_ADDRESS,
+  VOTING_CONTRACT_ABI,
+} from "../../constants/contract";
 import { toast } from "sonner";
 import type { RootState } from "../store";
+import { mapCampaignStatus } from "../../utils/helpers";
 
 export const fetchCampaigns = createAsyncThunk(
   "campaign/fetchCampaigns",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    if (!import.meta.env.VITE_RPC_URL) {
+      console.error("RPC URL is not configured");
+      throw new Error("RPC URL is not configured");
+    }
+
+    if (!VOTING_CONTRACT_ADDRESS) {
+      console.error("Contract address is not configured");
+      throw new Error("Contract address is not configured");
+    }
+
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
-      const nextCampaignId = await contract.nextCampaignId();
-      const campaigns = [];
+      // Get nearby campaigns first to find active campaign IDs
+      const campaignIds = await contract.getNearbyCampaigns();
 
-      for (let i = 1; i < nextCampaignId; i++) {
+      console.log("Found", campaignIds.length, "nearby campaigns");
+
+      if (campaignIds.length === 0) {
+        console.log("No nearby campaigns found");
+        return [];
+      }
+
+      const campaigns = [];
+      console.log(`Fetching details for ${campaignIds.length} campaigns`);
+
+      // Process each campaign ID from getNearbyCampaigns
+      for (let i = 0; i < campaignIds.length; i++) {
+        const campaignId = campaignIds[i];
         try {
           const [
             startDate,
@@ -29,35 +59,240 @@ export const fetchCampaigns = createAsyncThunk(
             totalVotes,
             voterCount,
             candidateCount,
-            status
-          ] = await contract.getCampaignDetails(i);
+            status,
+          ] = await contract.getCampaignDetails(campaignId);
 
           if (!isDeleted) {
             campaigns.push({
-              campaignId: i,
-              startDate: startDate.toString(),
-              endDate: endDate.toString(),
+              id: Number(campaignId.toString()), // Convert BigInt to number properly
+              startDate: Number(startDate.toString()), // Convert to number
+              endDate: Number(endDate.toString()),
               winner,
               isOpen,
               isDeleted,
               detailsIpfsHash,
               title,
               description,
-              totalVotes: totalVotes.toString(),
-              voterCount: voterCount.toString(),
-              candidateCount: candidateCount.toString(),
-              status: parseInt(status.toString())
+              totalVotes: Number(totalVotes.toString()), // Convert to number
+              voterCount: Number(voterCount.toString()), // Convert to number
+              candidateCount: Number(candidateCount.toString()), // Convert to number
+              status: mapCampaignStatus(status),
             });
           }
         } catch (error) {
-          console.warn(`Failed to fetch campaign ${i}:`, error);
+          console.warn(`Failed to fetch campaign ${campaignId}:`, error);
         }
       }
 
       return campaigns;
+    } catch (error: unknown) {
+      interface ExtendedError extends Error {
+        code?: string;
+        reason?: string;
+      }
+
+      const err = error as ExtendedError;
+      console.error("Error fetching campaigns:", err);
+
+      let errorMessage = "Failed to fetch campaigns";
+      const message = err.message || "";
+
+      if (err.code === "NETWORK_ERROR" || err.code === "SERVER_ERROR") {
+        errorMessage = `Network error: ${
+          message || "Unable to connect to the blockchain"
+        }`;
+      } else if (err.code === "CALL_EXCEPTION") {
+        errorMessage = `Contract error: ${
+          err.reason || message || "Invalid contract call"
+        }`;
+      } else if (message.includes("missing provider")) {
+        errorMessage = "Web3 provider not available";
+      } else if (message.includes("invalid address")) {
+        errorMessage = "Invalid contract address";
+      }
+
+      toast.error(errorMessage);
+      const newError = new Error(errorMessage);
+      Object.defineProperty(newError, "cause", { value: error });
+      throw newError;
+    }
+  }
+);
+
+export const getCampaignParticipants = createAsyncThunk(
+  "campaign/getCampaignParticipants",
+  async ({
+    campaignId,
+    provider,
+  }: {
+    campaignId: number;
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
+
+    try {
+      const [candidates, candidateNames, voteCounts] =
+        await contract.getCampaignCandidates(campaignId);
+      const [voters, voterNames, hasVotedList] =
+        await contract.getCampaignVoters(campaignId);
+
+      // Helper function to fetch user details including profile image
+      const fetchUserDetails = async (address: string) => {
+        try {
+          const userDetails = await contract.userDetails(address);
+          return {
+            name: userDetails.name || "",
+            email: userDetails.email || "",
+            dateOfBirth: Number(userDetails.dateOfBirth) || 0,
+            identityNumber: userDetails.identityNumber || "",
+            contactNumber: userDetails.contactNumber || "",
+            bio: userDetails.bio || "",
+            profileImageIpfsHash: userDetails.profileImageIpfsHash || "",
+            supportiveLinks: Array.isArray(userDetails.supportiveLinks)
+              ? userDetails.supportiveLinks
+              : [],
+          };
+        } catch (error) {
+          console.warn(`Failed to fetch user details for ${address}:`, error);
+          return null;
+        }
+      };
+
+      // Fetch user details for all candidates
+      const candidateDetailsPromises = candidates.map(
+        async (candidate: string, index: number) => {
+          const userDetails = await fetchUserDetails(candidate);
+          return {
+            address: candidate,
+            name: candidateNames[index] || userDetails?.name || "",
+            votes: voteCounts[index].toString(),
+            type: "candidate",
+            profileImageIpfsHash: userDetails?.profileImageIpfsHash || "",
+            email: userDetails?.email || "",
+            bio: userDetails?.bio || "",
+            contactNumber: userDetails?.contactNumber || "",
+            supportiveLinks: userDetails?.supportiveLinks || [],
+          };
+        }
+      );
+
+      // Fetch user details for all voters
+      const voterDetailsPromises = voters.map(
+        async (voter: string, index: number) => {
+          const userDetails = await fetchUserDetails(voter);
+          return {
+            address: voter,
+            name: voterNames[index] || userDetails?.name || "",
+            hasVoted: hasVotedList[index],
+            type: "voter",
+            profileImageIpfsHash: userDetails?.profileImageIpfsHash || "",
+            email: userDetails?.email || "",
+            bio: userDetails?.bio || "",
+            contactNumber: userDetails?.contactNumber || "",
+          };
+        }
+      );
+
+      // Wait for all user details to be fetched
+      const [candidateDetails, voterDetails] = await Promise.all([
+        Promise.all(candidateDetailsPromises),
+        Promise.all(voterDetailsPromises),
+      ]);
+
+      return {
+        campaignId,
+        candidates: candidateDetails,
+        voters: voterDetails,
+      };
     } catch (error) {
-      console.error("Error fetching campaigns:", error);
-      toast.error("Failed to fetch campaigns");
+      console.error("Failed to fetch campaign participants:", error);
+      toast.error("Failed to fetch campaign participants");
+      throw error;
+    }
+  }
+);
+
+export const getCampaignWithParticipants = createAsyncThunk(
+  "campaign/getCampaignWithParticipants",
+  async ({
+    campaignId,
+    provider,
+  }: {
+    campaignId: number;
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
+
+    try {
+      // Get campaign details
+      const [
+        startDate,
+        endDate,
+        winner,
+        isOpen,
+        isDeleted,
+        detailsIpfsHash,
+        title,
+        description,
+        totalVotes,
+        voterCount,
+        candidateCount,
+        status,
+      ] = await contract.getCampaignDetails(campaignId);
+
+      // Get participants
+      const [candidates, candidateNames, voteCounts] =
+        await contract.getCampaignCandidates(campaignId);
+      const [voters, voterNames, hasVotedList] =
+        await contract.getCampaignVoters(campaignId);
+
+      const candidateDetails = candidates.map(
+        (candidate: string, index: number) => ({
+          address: candidate,
+          name: candidateNames[index],
+          votes: voteCounts[index].toString(),
+          type: "candidate",
+        })
+      );
+
+      const voterDetails = voters.map((voter: string, index: number) => ({
+        address: voter,
+        name: voterNames[index],
+        hasVoted: hasVotedList[index],
+        type: "voter",
+      }));
+
+      return {
+        id: Number(campaignId),
+        startDate: Number(startDate.toString()), // Convert to number
+        endDate: Number(endDate.toString()),
+        winner,
+        isOpen,
+        isDeleted,
+        detailsIpfsHash,
+        title,
+        description,
+        totalVotes: Number(totalVotes.toString()), // Convert to number
+        voterCount: Number(voterCount.toString()), // Convert to number
+        candidateCount: Number(candidateCount.toString()),
+        status: mapCampaignStatus(status),
+        candidates: candidateDetails,
+        voters: voterDetails,
+      };
+    } catch (error) {
+      toast.error("Failed to fetch campaign with participants");
       throw error;
     }
   }
@@ -65,10 +300,16 @@ export const fetchCampaigns = createAsyncThunk(
 
 export const fetchNearbyCampaigns = createAsyncThunk(
   "campaign/fetchNearbyCampaigns",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    // Use provided provider or fallback to RPC URL
+    // Since provider is no longer in Redux state, we need it passed or use fallback
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const campaignIds = await contract.getNearbyCampaigns();
@@ -88,23 +329,23 @@ export const fetchNearbyCampaigns = createAsyncThunk(
             totalVotes,
             voterCount,
             candidateCount,
-            status
+            status,
           ] = await contract.getCampaignDetails(id);
 
           campaigns.push({
-            campaignId: id.toString(),
-            startDate: startDate.toString(),
-            endDate: endDate.toString(),
+            id: Number(id.toString()),
+            startDate: Number(startDate.toString()), // Convert to number
+            endDate: Number(endDate.toString()),
             winner,
             isOpen,
             isDeleted,
             detailsIpfsHash,
             title,
             description,
-            totalVotes: totalVotes.toString(),
-            voterCount: voterCount.toString(),
-            candidateCount: candidateCount.toString(),
-            status: parseInt(status.toString())
+            totalVotes: Number(totalVotes.toString()), // Convert to number
+            voterCount: Number(voterCount.toString()), // Convert to number
+            candidateCount: Number(candidateCount.toString()),
+            status: mapCampaignStatus(status),
           });
         } catch (error) {
           console.warn(`Failed to fetch nearby campaign ${id}:`, error);
@@ -113,6 +354,7 @@ export const fetchNearbyCampaigns = createAsyncThunk(
 
       return campaigns;
     } catch (error) {
+      console.error("Error fetching nearby campaigns:", error);
       toast.error("Failed to fetch nearby campaigns");
       throw error;
     }
@@ -121,47 +363,54 @@ export const fetchNearbyCampaigns = createAsyncThunk(
 
 export const createCampaign = createAsyncThunk(
   "campaign/createCampaign",
-  async ({
-    startDate,
-    endDate,
-    campaignDetailsIpfsHash,
-    title,
-    description,
-    account
-  }: {
-    startDate: number;
-    endDate: number;
-    campaignDetailsIpfsHash: string;
-    title: string;
-    description: string;
-    account?: string; // Make optional
-  }, { getState }) => {
+  async (
+    {
+      startDate,
+      endDate,
+      campaignDetailsIpfsHash,
+      title,
+      description,
+      account,
+      signer, // Add signer as a required parameter
+    }: {
+      startDate: number;
+      endDate: number;
+      campaignDetailsIpfsHash: string;
+      title: string;
+      description: string;
+      account?: string; // Make optional
+      signer: ethers.Signer; // Add signer parameter
+    },
+    { getState }
+  ) => {
     const state = getState() as RootState;
     const userAccount = account || state.user.account;
-    
+
     // Enhanced wallet connection check
     if (!userAccount) {
       throw new Error("Wallet not connected - No account found");
     }
 
-    // Try to get signer from state first, if not available, create from provider
-    let signer = state.user.signer;
-    
-    if (!signer && state.user.provider) {
-      try {
-        // Create signer from provider if not in state
-        signer = state.user.signer;
-      } catch (error) {
-        console.error("Failed to get signer from provider:", error);
-        throw new Error("Failed to get wallet signer");
-      }
-    }
-    
-    if (!signer) {
-      throw new Error("Wallet not connected - No signer available");
+    // Check if wallet is connected via Redux state
+    if (!state.user.signerConnected) {
+      throw new Error("Wallet not connected - Signer not available");
     }
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    console.log("Step 5", signer);
+
+    if (!signer) {
+      throw new Error("Wallet not connected - No signer provided");
+    }
+
+    console.log("Step 6");
+    console.log("Signer:", signer);
+
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
+    console.log("Contract:", contract);
 
     try {
       // Note: Remove userAccount from contract call as it's not in the Solidity function
@@ -173,19 +422,19 @@ export const createCampaign = createAsyncThunk(
         description
         // Remove userAccount - it's not a parameter in the smart contract function
       );
-      
       const receipt = await tx.wait();
+      console.log("Receipt:", receipt);
       toast.success("Campaign created successfully");
-      
+
       let campaignId = null;
-      
+
       for (const log of receipt.logs) {
         try {
           const parsed = contract.interface.parseLog({
             topics: log.topics,
-            data: log.data
+            data: log.data,
           });
-          
+
           if (parsed && parsed.name === "CampaignCreated") {
             campaignId = parsed.args.campaignId?.toString();
             break;
@@ -194,19 +443,19 @@ export const createCampaign = createAsyncThunk(
           continue;
         }
       }
-
+      console.log("Campaign ID:", campaignId);
       return {
         transactionHash: receipt.hash,
-        campaignId,
-        startDate: startDate.toString(),
-        endDate: endDate.toString(),
+        campaignId: campaignId ? Number(campaignId) : null, // Convert to number
+        startDate: Number(startDate.toString()), // Convert to number
+        endDate: Number(endDate.toString()),
         title,
         description,
-        campaignDetailsIpfsHash
+        campaignDetailsIpfsHash,
       };
     } catch (error) {
       console.error("Error creating campaign:", error);
-      
+
       let errorMessage = "Failed to create campaign";
       if (error instanceof Error && error.message) {
         if (error.message.includes("Invalid dates")) {
@@ -222,11 +471,10 @@ export const createCampaign = createAsyncThunk(
         } else if (error.message.includes("insufficient funds")) {
           errorMessage = "Insufficient funds for transaction";
         } else {
-          // Include the actual error message for debugging
           errorMessage = `Failed to create campaign: ${error.message}`;
         }
       }
-      
+
       toast.error(errorMessage);
       throw new Error(errorMessage);
     }
@@ -237,16 +485,18 @@ export const deleteCampaign = createAsyncThunk(
   "campaign/deleteCampaign",
   async ({
     campaignId,
-    adminAddress
+    adminAddress,
+    signer,
   }: {
     campaignId: number;
     adminAddress: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
-    if (!signer) throw new Error("Wallet not connected");
-
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    signer: ethers.Signer;
+  }) => {
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.deleteCampaign(campaignId, adminAddress);
@@ -255,7 +505,7 @@ export const deleteCampaign = createAsyncThunk(
 
       return {
         transactionHash: receipt.transactionHash,
-        campaignId
+        campaignId,
       };
     } catch (error) {
       toast.error("Failed to delete campaign");
@@ -266,10 +516,14 @@ export const deleteCampaign = createAsyncThunk(
 
 export const getActiveCampaign = createAsyncThunk(
   "campaign/getActiveCampaign",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const activeCampaignId = await contract.getActiveCampaignId();
@@ -290,23 +544,23 @@ export const getActiveCampaign = createAsyncThunk(
         totalVotes,
         voterCount,
         candidateCount,
-        status
+        status,
       ] = await contract.getCampaignDetails(activeCampaignId);
 
       return {
-        campaignId: activeCampaignId.toString(),
-        startDate: startDate.toString(),
-        endDate: endDate.toString(),
+        id: Number(activeCampaignId.toString()),
+        startDate: Number(startDate.toString()), // Convert to number
+        endDate: Number(endDate.toString()),
         winner,
         isOpen,
         isDeleted,
         detailsIpfsHash,
         title,
         description,
-        totalVotes: totalVotes.toString(),
-        voterCount: voterCount.toString(),
-        candidateCount: candidateCount.toString(),
-        status: parseInt(status.toString())
+        totalVotes: Number(totalVotes.toString()), // Convert to number
+        voterCount: Number(voterCount.toString()), // Convert to number
+        candidateCount: Number(candidateCount.toString()),
+        status: mapCampaignStatus(status),
       };
     } catch (error) {
       toast.error("Failed to fetch active campaign");
@@ -317,10 +571,14 @@ export const getActiveCampaign = createAsyncThunk(
 
 export const hasActiveCampaign = createAsyncThunk(
   "campaign/hasActiveCampaign",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async (provider?: ethers.Provider) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const hasActive = await contract.hasActiveCampaign();
@@ -333,7 +591,7 @@ export const hasActiveCampaign = createAsyncThunk(
 
       return {
         hasActiveCampaign: hasActive,
-        activeCampaignId
+        activeCampaignId: Number(activeCampaignId.toString()),
       };
     } catch (error) {
       toast.error("Failed to check active campaign");
@@ -344,12 +602,18 @@ export const hasActiveCampaign = createAsyncThunk(
 
 export const registerForCampaign = createAsyncThunk(
   "campaign/registerForCampaign",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
-    if (!signer) throw new Error("Wallet not connected");
-
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+  async ({
+    campaignId,
+    signer,
+  }: {
+    campaignId: number;
+    signer: ethers.Signer;
+  }) => {
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.registerForCampaign(campaignId);
@@ -358,7 +622,7 @@ export const registerForCampaign = createAsyncThunk(
 
       return {
         transactionHash: receipt.transactionHash,
-        campaignId
+        campaignId,
       };
     } catch (error) {
       toast.error("Failed to register for campaign");
@@ -371,23 +635,32 @@ export const checkUserRegistration = createAsyncThunk(
   "campaign/checkUserRegistration",
   async ({
     campaignId,
-    userAddress
+    userAddress,
+    provider,
   }: {
     campaignId: number;
     userAddress: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
-      const [isVoter, isCandidate] = await contract.isUserRegisteredForCampaign(campaignId, userAddress);
+      const [isVoter, isCandidate] = await contract.isUserRegisteredForCampaign(
+        campaignId,
+        userAddress
+      );
 
       return {
         campaignId,
         userAddress,
         isVoter,
-        isCandidate
+        isCandidate,
       };
     } catch (error) {
       toast.error("Failed to check user registration");
@@ -400,14 +673,20 @@ export const getCandidateVotes = createAsyncThunk(
   "campaign/getCandidateVotes",
   async ({
     campaignId,
-    candidate
+    candidate,
+    provider,
   }: {
     campaignId: number;
     candidate: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const votes = await contract.getCandidateVotes(campaignId, candidate);
@@ -415,7 +694,7 @@ export const getCandidateVotes = createAsyncThunk(
       return {
         campaignId,
         candidate,
-        votes: votes.toString()
+        votes: votes.toString(),
       };
     } catch (error) {
       toast.error("Failed to fetch candidate votes");
@@ -426,23 +705,36 @@ export const getCandidateVotes = createAsyncThunk(
 
 export const getAllCandidateVotes = createAsyncThunk(
   "campaign/getAllCandidateVotes",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({
+    campaignId,
+    provider,
+  }: {
+    campaignId: number;
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
-      const [candidates, names, voteCounts] = await contract.getCampaignCandidates(campaignId);
+      const [candidates, names, voteCounts] =
+        await contract.getCampaignCandidates(campaignId);
 
-      const candidateVotes = candidates.map((candidate: string, index: number) => ({
-        candidate,
-        name: names[index],
-        votes: voteCounts[index].toString()
-      }));
+      const candidateVotes = candidates.map(
+        (candidate: string, index: number) => ({
+          candidate,
+          name: names[index],
+          votes: voteCounts[index].toString(),
+        })
+      );
 
       return {
         campaignId,
-        candidateVotes
+        candidateVotes,
       };
     } catch (error) {
       toast.error("Failed to fetch candidate votes");
@@ -455,16 +747,20 @@ export const castVote = createAsyncThunk(
   "campaign/castVote",
   async ({
     campaignId,
-    candidate
+    candidate,
+    signer,
   }: {
     campaignId: number;
     candidate: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+    signer: ethers.Signer;
+  }) => {
     if (!signer) throw new Error("Wallet not connected");
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.vote(campaignId, candidate);
@@ -474,7 +770,7 @@ export const castVote = createAsyncThunk(
       return {
         transactionHash: receipt.transactionHash,
         campaignId,
-        candidate
+        candidate,
       };
     } catch (error) {
       toast.error("Failed to cast vote");
@@ -487,14 +783,20 @@ export const getUserVote = createAsyncThunk(
   "campaign/getUserVote",
   async ({
     campaignId,
-    userAddress
+    userAddress,
+    provider,
   }: {
     campaignId: number;
     userAddress: string;
-  }, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const votedCandidate = await contract.votes(userAddress, campaignId);
@@ -502,7 +804,8 @@ export const getUserVote = createAsyncThunk(
       return {
         campaignId,
         userAddress,
-        votedCandidate: votedCandidate === ethers.ZeroAddress ? null : votedCandidate
+        votedCandidate:
+          votedCandidate === ethers.ZeroAddress ? null : votedCandidate,
       };
     } catch (error) {
       toast.error("Failed to fetch user vote");
@@ -513,12 +816,20 @@ export const getUserVote = createAsyncThunk(
 
 export const manualCloseCampaign = createAsyncThunk(
   "campaign/manualCloseCampaign",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+  async ({
+    campaignId,
+    signer,
+  }: {
+    campaignId: number;
+    signer: ethers.Signer;
+  }) => {
     if (!signer) throw new Error("Wallet not connected");
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.manualCloseCampaign(campaignId);
@@ -527,7 +838,7 @@ export const manualCloseCampaign = createAsyncThunk(
 
       return {
         transactionHash: receipt.transactionHash,
-        campaignId
+        campaignId,
       };
     } catch (error) {
       toast.error("Failed to close campaign");
@@ -538,17 +849,21 @@ export const manualCloseCampaign = createAsyncThunk(
 
 export const checkUpkeep = createAsyncThunk(
   "campaign/checkUpkeep",
-  async (_, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({ provider }: { provider: ethers.Provider }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const [upkeepNeeded, performData] = await contract.checkUpkeep("0x");
 
       return {
         upkeepNeeded,
-        performData
+        performData,
       };
     } catch (error) {
       toast.error("Failed to check upkeep");
@@ -559,12 +874,20 @@ export const checkUpkeep = createAsyncThunk(
 
 export const performUpkeep = createAsyncThunk(
   "campaign/performUpkeep",
-  async (performData: string, { getState }) => {
-    const state = getState() as RootState;
-    const signer = state.user.signer;
+  async ({
+    performData,
+    signer,
+  }: {
+    performData: string;
+    signer: ethers.Signer;
+  }) => {
     if (!signer) throw new Error("Wallet not connected");
 
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      signer
+    );
 
     try {
       const tx = await contract.performUpkeep(performData);
@@ -573,7 +896,7 @@ export const performUpkeep = createAsyncThunk(
 
       return {
         transactionHash: receipt.transactionHash,
-        performData
+        performData,
       };
     } catch (error) {
       toast.error("Failed to perform upkeep");
@@ -584,22 +907,36 @@ export const performUpkeep = createAsyncThunk(
 
 export const getCampaignStats = createAsyncThunk(
   "campaign/getCampaignStats",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({
+    campaignId,
+    provider,
+  }: {
+    campaignId: number;
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
-      const [totalVoters, votedCount, notVotedCount] = await contract.getVotingStats(campaignId);
-      const [candidateCount, voterCount] = await contract.getParticipantStats(campaignId);
+      const [totalVoters, votedCount, notVotedCount] =
+        await contract.getVotingStats(campaignId);
+      const [candidateCount, voterCount] = await contract.getParticipantStats(
+        campaignId
+      );
 
       return {
         campaignId,
-        totalVoters: totalVoters.toString(),
-        votedCount: votedCount.toString(),
-        notVotedCount: notVotedCount.toString(),
-        candidateCount: candidateCount.toString(),
-        voterCount: voterCount.toString()
+        totalVoters: Number(totalVoters.toString()), // Convert to number
+        votedCount: Number(votedCount.toString()), // Convert to number
+        notVotedCount: Number(notVotedCount.toString()), // Convert to number
+        candidateCount: Number(candidateCount.toString()), // Convert to number
+        voterCount: Number(voterCount.toString()), // Convert to number
+        totalVotes: Number(totalVoters.toString()),
       };
     } catch (error) {
       toast.error("Failed to fetch campaign statistics");
@@ -610,23 +947,35 @@ export const getCampaignStats = createAsyncThunk(
 
 export const getCampaignVoters = createAsyncThunk(
   "campaign/getCampaignVoters",
-  async (campaignId: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({
+    campaignId,
+    provider,
+  }: {
+    campaignId: number;
+    provider: ethers.Provider;
+  }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
-      const [voters, names, hasVotedList] = await contract.getCampaignVoters(campaignId);
+      const [voters, names, hasVotedList] = await contract.getCampaignVoters(
+        campaignId
+      );
 
       const voterDetails = voters.map((voter: string, index: number) => ({
         address: voter,
         name: names[index],
-        hasVoted: hasVotedList[index]
+        hasVoted: hasVotedList[index],
       }));
 
       return {
         campaignId,
-        voters: voterDetails
+        voters: voterDetails,
       };
     } catch (error) {
       toast.error("Failed to fetch campaign voters");
@@ -637,27 +986,31 @@ export const getCampaignVoters = createAsyncThunk(
 
 export const getMonthlyCampaigns = createAsyncThunk(
   "campaign/getMonthlyCampaigns",
-  async (month: number, { getState }) => {
-    const state = getState() as RootState;
-    const provider = state.user.provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
-    const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+  async ({ month, provider }: { month: number; provider: ethers.Provider }) => {
+    const contractProvider =
+      provider || new ethers.JsonRpcProvider(import.meta.env.VITE_RPC_URL);
+    const contract = new ethers.Contract(
+      VOTING_CONTRACT_ADDRESS,
+      VOTING_CONTRACT_ABI,
+      contractProvider
+    );
 
     try {
       const [campaignIds, startDates, endDates, titles, statuses, winners] =
         await contract.getMonthlyCampaigns(month);
 
       const campaigns = campaignIds.map((id: bigint, index: number) => ({
-        campaignId: id.toString(),
-        startDate: startDates[index].toString(),
-        endDate: endDates[index].toString(),
+        campaignId: Number(id.toString()), // Change from 'id' to 'campaignId'
+        startDate: Number(startDates[index].toString()), // Convert to number
+        endDate: Number(endDates[index].toString()),
         title: titles[index],
         status: parseInt(statuses[index].toString()),
-        winner: winners[index]
+        winner: winners[index],
       }));
 
       return {
         month,
-        campaigns
+        campaigns,
       };
     } catch (error) {
       toast.error("Failed to fetch monthly campaigns");

@@ -1,24 +1,16 @@
-import { Component, type ReactNode } from 'react';
+import { Component } from 'react';
 import { AlertCircle, RefreshCcw } from 'lucide-react';
 import { Button } from './ui/button';
+import type { ErrorBoundaryProps, ErrorBoundaryState } from '../types/errorBoundary';
 
-interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
-}
 
-interface State {
-  hasError: boolean;
-  error: Error | null;
-}
-
-export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  public state: ErrorBoundaryState = {
     hasError: false,
     error: null
   };
 
-  public static getDerivedStateFromError(error: Error): State {
+  public static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
 
@@ -46,14 +38,14 @@ export class ErrorBoundary extends Component<Props, State> {
               <Button
                 onClick={() => window.location.reload()}
                 variant="outline"
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50"
               >
                 <RefreshCcw className="w-4 h-4" />
                 Reload Page
               </Button>
               <Button
                 onClick={this.reset}
-                className="gap-2"
+                className="gap-2 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 bg-clip-text text-transparent"
               >
                 Try Again
               </Button>

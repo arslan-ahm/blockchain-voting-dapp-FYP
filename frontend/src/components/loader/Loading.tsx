@@ -1,9 +1,4 @@
-// src/components/Loading.tsx
-interface LoadingProps {
-  message?: string;
-}
-
-export const Loading = ({ message = "Loading..." }: LoadingProps) => {
+export const Loading = ({ message = "Loading..." }: { message?: string }) => {
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="flex flex-col items-center space-y-4">

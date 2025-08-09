@@ -6,6 +6,14 @@ export interface NavLink {
   icon?: string;
 }
 
+export const LANDING_PAGE_SECTIONS = [
+  { label: 'Home', id: '#hero' },
+  { label: 'About', id: '#about' },
+  { label: 'Features', id: '#features' },
+  { label: 'How It Works', id: '#how-it-works' },
+  { label: 'Roadmap', id: '#roadmap' }
+];
+
 export const PUBLIC_ROUTES: NavLink[] = [
   { to: '/', label: 'Home' },
 ];
@@ -19,6 +27,7 @@ export const ADMIN_ROUTES: NavLink[] = [
   { to: '/campaigns', label: 'Campaigns' },
   { to: '/admin', label: 'Dashboard' },
 ];
+
 
 export const AUTHENTICATED_ROUTES: NavLink[] = [
   { to: '/campaigns', label: 'Campaigns' },

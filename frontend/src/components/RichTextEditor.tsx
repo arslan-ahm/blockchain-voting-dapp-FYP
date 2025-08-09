@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Bold, 
-  Italic, 
-  Underline, 
-  List, 
-  ListOrdered, 
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  Bold,
+  Italic,
+  Underline,
+  List,
+  ListOrdered,
   AlignLeft,
   AlignCenter,
   AlignRight,
@@ -12,11 +12,27 @@ import {
   ChevronDown,
   Undo,
   Redo,
-  Strikethrough
-} from 'lucide-react';
+  Strikethrough,
+  Camera,
+  FileText,
+} from "lucide-react";
 
 // Utility function for className merging
-const cn = (...classes: (string | boolean | undefined)[]): string => classes.filter(Boolean).join(' ');
+const cn = (...classes: (string | boolean | undefined)[]): string =>
+  classes.filter(Boolean).join(" ");
+
+// DropdownMenu Components (simplified version)
+const DropdownMenu = ({ children }: { children: React.ReactNode }) => (
+  <div className="relative inline-block">{children}</div>
+);
+
+const DropdownMenuTrigger = ({ children }: { asChild?: boolean; children: React.ReactNode }) => (
+  <>{children}</>
+);
+
+const DropdownMenuContent = ({ className, children }: { align?: string; className?: string; children: React.ReactNode }) => (
+  <div className={className}>{children}</div>
+);
 
 // ImageUpload Component
 interface ImageUploadProps {
@@ -25,7 +41,11 @@ interface ImageUploadProps {
   className?: string;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({
+  onChange,
+  preview,
+  className,
+}) => {
   const [dragActive, setDragActive] = useState<boolean>(false);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
 
@@ -45,7 +65,10 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
       e.stopPropagation();
       setDragActive(false);
       const file = e.dataTransfer.files?.[0];
-      if (file && (file.type.startsWith("image/") || file.type === "application/pdf")) {
+      if (
+        file &&
+        (file.type.startsWith("image/") || file.type === "application/pdf")
+      ) {
         onChange(file);
         if (file.type.startsWith("image/")) {
           setLocalPreview(URL.createObjectURL(file));
@@ -78,7 +101,9 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
     <div
       className={cn(
         "relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors",
-        dragActive ? "border-blue-400 bg-blue-400/10" : "border-gray-600 bg-gray-700",
+        dragActive
+          ? "border-blue-400 bg-primary/10"
+          : "border-gray-600 bg-gray-700",
         className
       )}
       onDragEnter={handleDrag}
@@ -87,76 +112,23 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ onChange, preview, className 
       onDrop={handleDrop}
     >
       {displayPreview ? (
-        <img src={displayPreview} alt="Preview" className="h-32 w-32 object-cover rounded-lg mb-4" />
+        <img
+          src={displayPreview}
+          alt="Preview"
+          className="h-32 w-32 object-cover rounded-lg mb-4"
+        />
       ) : (
         <Upload className="h-12 w-12 text-gray-400 mb-4" />
       )}
-      <p className="text-gray-200 text-sm mb-2">Drag and drop an image or PDF, or click to select</p>
+      <p className="text-gray-200 text-sm mb-2">
+        Drag and drop an image or PDF, or click to select
+      </p>
       <input
         type="file"
         accept="image/*,application/pdf"
         onChange={handleChange}
         className="absolute inset-0 opacity-0 cursor-pointer"
       />
-    </div>
-  );
-};
-
-// Floating Menu Component
-interface FloatingMenuProps {
-  anchorRef: React.RefObject<HTMLElement>;
-  isOpen: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-}
-
-const FloatingMenu: React.FC<FloatingMenuProps> = ({ anchorRef, isOpen, onClose, children }) => {
-  const [position, setPosition] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (isOpen && anchorRef.current) {
-      const rect = anchorRef.current.getBoundingClientRect();
-      setPosition({
-        top: rect.bottom + 8,
-        left: rect.left
-      });
-    }
-  }, [isOpen, anchorRef]);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (
-        menuRef.current &&
-        !menuRef.current.contains(event.target as Node) &&
-        anchorRef.current &&
-        !anchorRef.current.contains(event.target as Node)
-      ) {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen, onClose, anchorRef]);
-
-  if (!isOpen) return null;
-
-  return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 bg-gray-800 border border-gray-600 rounded-lg shadow-lg p-4 min-w-80"
-      style={{
-        top: position.top,
-        left: position.left
-      }}
-    >
-      {children}
     </div>
   );
 };
@@ -170,12 +142,12 @@ interface RichTextEditorProps {
   placeholder?: string;
 }
 
-const RichTextEditor: React.FC<RichTextEditorProps> = ({ 
-  value = '', 
-  onChange, 
-  onUpload, 
+const RichTextEditor: React.FC<RichTextEditorProps> = ({
+  value = "",
+  onChange,
+  onUpload,
   isUploading = false,
-  placeholder = "Start writing..." 
+  placeholder = "Start writing...",
 }) => {
   const [content, setContent] = useState<string>(value);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
@@ -183,8 +155,24 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const [redoStack, setRedoStack] = useState<string[]>([]);
   const [currentSelection, setCurrentSelection] = useState<Range | null>(null);
   
+  // Formatting state
+  const [formatState, setFormatState] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    alignLeft: false,
+    alignCenter: false,
+    alignRight: false,
+    bulletList: false,
+    orderedList: false,
+    currentFormat: 'p'
+  });
+
   const editorRef = useRef<HTMLDivElement>(null);
   const uploadButtonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Initialize content
   useEffect(() => {
@@ -194,12 +182,64 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   }, [value, content]);
 
-  // Save selection
+  // Update formatting state based on current selection
+  const updateFormatState = useCallback((): void => {
+    if (!editorRef.current) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    try {
+      const newFormatState = {
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strikethrough: document.queryCommandState('strikeThrough'),
+        alignLeft: document.queryCommandState('justifyLeft'),
+        alignCenter: document.queryCommandState('justifyCenter'),
+        alignRight: document.queryCommandState('justifyRight'),
+        bulletList: document.queryCommandState('insertUnorderedList'),
+        orderedList: document.queryCommandState('insertOrderedList'),
+        currentFormat: document.queryCommandValue('formatBlock') || 'p'
+      };
+
+      setFormatState(newFormatState);
+    } catch (error) {
+      // Fallback if queryCommandState fails
+      console.warn('Failed to update format state:', error);
+    }
+  }, []);
+
+  // Handle click outside to close menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node) &&
+        uploadButtonRef.current &&
+        !uploadButtonRef.current.contains(event.target as Node)
+      ) {
+        setIsMenuOpen(false);
+      }
+    };
+
+    if (isMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isMenuOpen]);
+
+  // Save selection and update format state
   const saveSelection = (): void => {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       setCurrentSelection(selection.getRangeAt(0).cloneRange());
     }
+    // Update format state whenever selection changes
+    setTimeout(updateFormatState, 0);
   };
 
   // Restore selection
@@ -219,19 +259,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     document.execCommand(command, false, value ?? undefined);
     editorRef.current?.focus();
     handleContentChange();
+    // Update format state after command execution
+    setTimeout(updateFormatState, 0);
   };
 
   // Handle content changes
   const handleContentChange = useCallback((): void => {
     if (editorRef.current) {
       const newContent = editorRef.current.innerHTML;
-      
+
       // Add to undo stack
       if (content !== newContent) {
-        setUndoStack(prev => [...prev.slice(-19), content]); // Keep last 20 states
+        setUndoStack((prev) => [...prev.slice(-19), content]); // Keep last 20 states
         setRedoStack([]); // Clear redo stack on new change
       }
-      
+
       setContent(newContent);
       onChange?.(newContent);
     }
@@ -241,13 +283,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleUndo = (): void => {
     if (undoStack.length > 0) {
       const previousState = undoStack[undoStack.length - 1];
-      setRedoStack(prev => [content, ...prev]);
-      setUndoStack(prev => prev.slice(0, -1));
+      setRedoStack((prev) => [content, ...prev]);
+      setUndoStack((prev) => prev.slice(0, -1));
       setContent(previousState);
       if (editorRef.current) {
         editorRef.current.innerHTML = previousState;
       }
       onChange?.(previousState);
+      setTimeout(updateFormatState, 0);
     }
   };
 
@@ -255,13 +298,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleRedo = (): void => {
     if (redoStack.length > 0) {
       const nextState = redoStack[0];
-      setUndoStack(prev => [...prev, content]);
-      setRedoStack(prev => prev.slice(1));
+      setUndoStack((prev) => [...prev, content]);
+      setRedoStack((prev) => prev.slice(1));
       setContent(nextState);
       if (editorRef.current) {
         editorRef.current.innerHTML = nextState;
       }
       onChange?.(nextState);
+      setTimeout(updateFormatState, 0);
     }
   };
 
@@ -269,7 +313,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     if (e.ctrlKey || e.metaKey) {
       switch (e.key) {
-        case 'z':
+        case "z":
           e.preventDefault();
           if (e.shiftKey) {
             handleRedo();
@@ -277,46 +321,62 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
             handleUndo();
           }
           break;
-        case 'y':
+        case "y":
           e.preventDefault();
           handleRedo();
           break;
-        case 'b':
+        case "b":
           e.preventDefault();
-          execCommand('bold');
+          execCommand("bold");
           break;
-        case 'i':
+        case "i":
           e.preventDefault();
-          execCommand('italic');
+          execCommand("italic");
           break;
-        case 'u':
+        case "u":
           e.preventDefault();
-          execCommand('underline');
+          execCommand("underline");
           break;
       }
     }
   };
 
-  // Handle file upload
-  const handleFileUpload = (file: File | null): void => {
+  // Handle file upload from input
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>): void => {
+    const file = e.target.files?.[0];
     if (file) {
       onUpload?.(file);
       setIsMenuOpen(false);
     }
   };
 
+  // Handle file upload from drag/drop
+  const handleFileUploadDrop = (file: File | null): void => {
+    if (file) {
+      onUpload?.(file);
+      setIsMenuOpen(false);
+    }
+  };
+
+  // Handle file input click
+  const handleFileInputClick = (): void => {
+    fileInputRef.current?.click();
+  };
+
   // Custom heading sizes
-  const headingSizes: { [key: string]: { tag: string; size: string; weight: string } } = {
-    'H1': { tag: 'h1', size: '2.5rem', weight: 'bold' },
-    'H2': { tag: 'h2', size: '2rem', weight: 'bold' },
-    'H3': { tag: 'h3', size: '1.5rem', weight: 'bold' },
-    'H4': { tag: 'h4', size: '1.25rem', weight: 'bold' },
-    'H5': { tag: 'h5', size: '1.125rem', weight: 'bold' },
-    'H6': { tag: 'h6', size: '1rem', weight: 'bold' }
+  const headingSizes: {
+    [key: string]: { tag: string; size: string; weight: string };
+  } = {
+    H1: { tag: "h1", size: "2.5rem", weight: "bold" },
+    H2: { tag: "h2", size: "2rem", weight: "bold" },
+    H3: { tag: "h3", size: "1.5rem", weight: "bold" },
+    H4: { tag: "h4", size: "1.25rem", weight: "bold" },
+    H5: { tag: "h5", size: "1.125rem", weight: "bold" },
+    H6: { tag: "h6", size: "1rem", weight: "bold" },
   };
 
   const applyHeading = (tag: string): void => {
-    execCommand('formatBlock', tag);
+    execCommand("formatBlock", tag);
     // Apply custom styling
     setTimeout(() => {
       const selection = window.getSelection();
@@ -326,10 +386,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           const style = headingSizes[tag.toUpperCase()];
           element.style.fontSize = style.size;
           element.style.fontWeight = style.weight;
-          element.style.marginBottom = '0.5rem';
+          element.style.marginBottom = "0.5rem";
         }
       }
+      updateFormatState();
     }, 0);
+  };
+
+  // Get button active state
+  const getButtonClass = (isActive: boolean): string => {
+    return cn(
+      "p-2 rounded transition-colors",
+      isActive 
+        ? "bg-primary text-white" 
+        : "bg-gray-700 hover:bg-gray-600 text-white"
+    );
   };
 
   return (
@@ -359,15 +430,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Format Dropdown */}
           <select
+            value={formatState.currentFormat}
             onChange={(e) => {
-              if (e.target.value === 'p') {
-                execCommand('formatBlock', 'p');
+              if (e.target.value === "p") {
+                execCommand("formatBlock", "p");
               } else {
                 applyHeading(e.target.value);
               }
             }}
             className="px-3 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
-            defaultValue="p"
           >
             <option value="p">Paragraph</option>
             <option value="h1">Heading 1 (2.5rem)</option>
@@ -382,29 +453,29 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Text Formatting */}
           <button
-            onClick={() => execCommand('bold')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("bold")}
+            className={getButtonClass(formatState.bold)}
             title="Bold (Ctrl+B)"
           >
             <Bold className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('italic')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("italic")}
+            className={getButtonClass(formatState.italic)}
             title="Italic (Ctrl+I)"
           >
             <Italic className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('underline')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("underline")}
+            className={getButtonClass(formatState.underline)}
             title="Underline (Ctrl+U)"
           >
             <Underline className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('strikeThrough')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("strikeThrough")}
+            className={getButtonClass(formatState.strikethrough)}
             title="Strikethrough"
           >
             <Strikethrough className="w-4 h-4" />
@@ -414,22 +485,22 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Alignment */}
           <button
-            onClick={() => execCommand('justifyLeft')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("justifyLeft")}
+            className={getButtonClass(formatState.alignLeft)}
             title="Align Left"
           >
             <AlignLeft className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('justifyCenter')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("justifyCenter")}
+            className={getButtonClass(formatState.alignCenter)}
             title="Align Center"
           >
             <AlignCenter className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('justifyRight')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("justifyRight")}
+            className={getButtonClass(formatState.alignRight)}
             title="Align Right"
           >
             <AlignRight className="w-4 h-4" />
@@ -439,15 +510,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
           {/* Lists */}
           <button
-            onClick={() => execCommand('insertUnorderedList')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("insertUnorderedList")}
+            className={getButtonClass(formatState.bulletList)}
             title="Bullet List"
           >
             <List className="w-4 h-4" />
           </button>
           <button
-            onClick={() => execCommand('insertOrderedList')}
-            className="p-2 bg-gray-700 hover:bg-gray-600 rounded transition-colors"
+            onClick={() => execCommand("insertOrderedList")}
+            className={getButtonClass(formatState.orderedList)}
             title="Numbered List"
           >
             <ListOrdered className="w-4 h-4" />
@@ -456,30 +527,62 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
           <div className="flex-1" />
 
           {/* Upload Button Group */}
-          <div className="flex">
+          <div className="flex relative bg-primary rounded-md">
             <button
               onClick={() => onUpload?.(content)}
               disabled={isUploading || !content.trim()}
               className={cn(
                 "flex items-center gap-2 px-4 py-2 font-medium transition-colors rounded-l",
                 isUploading || !content.trim()
-                  ? 'bg-gray-600 cursor-not-allowed text-gray-400'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  ? "bg-gray-600 cursor-not-allowed text-gray-400"
+                  : "bg-primary text-white"
               )}
             >
               <Upload className="w-4 h-4" />
-              {isUploading ? 'Uploading...' : 'Upload'}
+              {isUploading ? "Uploading..." : "Upload"}
             </button>
-            <button
-              ref={uploadButtonRef}
-              onClick={() => {
-                saveSelection();
-                setIsMenuOpen(!isMenuOpen);
-              }}
-              className="px-2 py-2 bg-blue-600 hover:bg-blue-700 border-l border-blue-500 rounded-r transition-colors"
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className={cn(
+                    "px-2 py-2 border-l border-blue-500 rounded-r text-white transition-colors"
+                  )}
+                  onClick={() => setIsMenuOpen(!isMenuOpen)}
+                >
+                  <ChevronDown className="w-4 h-4 mt-1" />
+                </button>
+              </DropdownMenuTrigger>
+
+              {isMenuOpen && (
+                <DropdownMenuContent align="end" className="absolute right-0 top-full mt-2 z-50 bg-gray-800 border border-gray-700 rounded-lg shadow-lg w-64">
+                  <div ref={menuRef} className="p-4 space-y-3">
+                    <h4 className="text-white font-medium">Upload Document</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleFileInputClick}
+                        className="w-full flex items-center justify-start gap-2 px-3 py-2 text-gray-300 hover:bg-gray-700 rounded transition-colors"
+                      >
+                        <Camera className="w-4 h-4" />
+                        Upload Image
+                      </button>
+                      <button
+                        onClick={handleFileInputClick}
+                        className="w-full flex items-center justify-start gap-2 px-3 py-2 text-gray-300 hover:bg-gray-700 rounded transition-colors"
+                      >
+                        <FileText className="w-4 h-4" />
+                        Upload Document
+                      </button>
+                    </div>
+                    <div className="pt-2 border-t border-gray-700">
+                      <ImageUpload
+                        onChange={handleFileUploadDrop}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+                </DropdownMenuContent>
+              )}
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -492,34 +595,23 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         onKeyDown={handleKeyDown}
         onMouseUp={saveSelection}
         onKeyUp={saveSelection}
+        onFocus={updateFormatState}
         className="min-h-96 p-4 text-white focus:outline-none"
         style={{
-          lineHeight: '1.6',
+          lineHeight: "1.6",
         }}
         suppressContentEditableWarning={true}
-        {...(placeholder && { 'data-placeholder': placeholder })}
+        {...(placeholder && { "data-placeholder": placeholder })}
       />
 
-      {/* Floating Upload Menu */}
-      <FloatingMenu
-        anchorRef={uploadButtonRef}
-        isOpen={isMenuOpen}
-        onClose={() => setIsMenuOpen(false)}
-      >
-        <div className="space-y-3">
-          <h3 className="text-white font-medium">Upload Document</h3>
-          <ImageUpload
-            onChange={handleFileUpload}
-            className="w-full"
-          />
-        </div>
-      </FloatingMenu>
-
-      {/* Help Text */}
-      <div className="border-t border-gray-600 p-3 text-sm text-gray-400">
-        <p><strong>Shortcuts:</strong> Ctrl+Z (Undo), Ctrl+Y (Redo), Ctrl+B (Bold), Ctrl+I (Italic), Ctrl+U (Underline)</p>
-        <p><strong>Placeholders:</strong> Use [START_DATE] and [END_DATE] for automatic date replacement</p>
-      </div>
+      {/* Hidden file input */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,.pdf,.doc,.docx"
+        className="hidden"
+        onChange={handleFileUpload}
+      />
     </div>
   );
 };
