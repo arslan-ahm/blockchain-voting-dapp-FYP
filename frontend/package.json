@@ -15,6 +15,7 @@
     "clean": "rm -rf dist node_modules/.vite"
   },
   "dependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@gsap/react": "^2.1.2",
     "@hookform/resolvers": "^5.0.1",
     "@metamask/providers": "^22.1.0",

@@ -1,0 +1,23 @@
+#!/bin/bash
+# Quick scripts for blockchain operations
+
+echo "🚀 Blockchain Deployment Scripts"
+echo "================================"
+echo ""
+echo "Available commands:"
+echo ""
+echo "1. Check account configuration:"
+echo "   npx hardhat run scripts/verify-account.js --network sepolia"
+echo ""
+echo "2. Check all account balances:"
+echo "   npx hardhat run scripts/check-all-accounts.js --network sepolia"
+echo ""
+echo "3. Check Sepolia balance and deployment cost:"
+echo "   npx hardhat run scripts/check-sepolia-balance.js --network sepolia"
+echo ""
+echo "4. Deploy to production:"
+echo "   bun run deploy:production"
+echo ""
+echo "5. Quick verify and deploy:"
+echo "   npx hardhat run scripts/verify-account.js --network sepolia && bun run deploy:production"
+echo ""

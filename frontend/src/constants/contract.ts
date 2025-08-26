@@ -1,9 +1,5 @@
 // Auto-generated contract constants
-// Network: localhost
-// Deployed at: 2025-08-05T04:18:09.167Z
-// Contract Address: 0x5FbDB2315678afecb367f032d93F642f64180aa3
-
-export const VOTING_CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+export const VOTING_CONTRACT_ADDRESS = "0x918d0a2031702fC206fb75d9D83F412B6265bB6f";
 export const VOTING_CONTRACT_ABI = [
   {
     "inputs": [
@@ -1556,11 +1552,21 @@ export const VOTING_CONTRACT_ABI = [
     "type": "function"
   }
 ];
-
 export const NETWORK_CONFIG = {
-  name: "localhost",
-  chainId: 31337,
-  rpcUrl: "http://127.0.0.1:8545",
-  blockExplorer: "http://localhost:8545",
-  contractAddress: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+  chainId: 11155111,
+  networkName: "sepolia",
+  rpcUrl: "https://sepolia.infura.io/v3/${process.env.VITE_INFURA_PROJECT_ID}",
+  blockExplorer: "https://sepolia.etherscan.io"
+};
+export const ADMIN_ADDRESS = "0xA17e2C49438e44456D401243a9ACa156605B2C12";
+export const DEPLOYMENT_INFO = {
+  "network": "sepolia",
+  "contractAddress": "0x918d0a2031702fC206fb75d9D83F412B6265bB6f",
+  "adminAddress": "0xA17e2C49438e44456D401243a9ACa156605B2C12",
+  "deployerAddress": "0xA17e2C49438e44456D401243a9ACa156605B2C12",
+  "deploymentTimestamp": "2025-09-01T02:43:58.025Z",
+  "transactionHash": "0x82dba62d8a3387a087af9406c0c2febf7b5c76380a39f94ba34d9c6befd7543a",
+  "blockNumber": null,
+  "gasUsed": "5201829",
+  "chainId": 11155111
 };

@@ -3,20 +3,56 @@ const fs = require("fs");
 const path = require("path");
 
 async function main() {
-  const [deployer] = await ethers.getSigners();
-  
-  console.log("🚀 Deploying to Sepolia Testnet...");
-  console.log("📝 Deployer address:", deployer.address);
-  console.log("💰 Deployer balance:", ethers.formatEther(await ethers.provider.getBalance(deployer.address)), "ETH");
+  try {
+    const [deployer] = await ethers.getSigners();
+    
+    console.log("🚀 Deploying to Sepolia Testnet...");
+    console.log("📝 Deployer address:", deployer.address);
+    
+    // Check balance first
+    const balance = await ethers.provider.getBalance(deployer.address);
+    const balanceInEth = ethers.formatEther(balance);
+    console.log("💰 Deployer balance:", balanceInEth, "SepoliaETH");
 
-  // Get admin address from environment or use deployer
-  const adminAddress = process.env.ADMIN_ADDRESS_PROD || process.env.ADMIN_ADDRESS_DEV || deployer.address;
-  console.log("👤 Admin address:", adminAddress);
+    // Get admin address from environment or use deployer
+    const adminAddress = process.env.ADMIN_ADDRESS_PROD || process.env.ADMIN_ADDRESS_DEV || deployer.address;
+    console.log("👤 Admin address:", adminAddress);
 
-  // Deploy the Voting contract
-  console.log("\n📦 Deploying Voting contract...");
-  const Voting = await ethers.getContractFactory("Voting");
-  const voting = await Voting.deploy(adminAddress);
+    // Estimate gas cost before deployment
+    console.log("\n⛽ Estimating deployment cost...");
+    const Voting = await ethers.getContractFactory("Voting");
+    
+    // Estimate gas
+    const deploymentData = Voting.interface.encodeDeploy([adminAddress]);
+    const gasEstimate = await deployer.estimateGas({
+      data: Voting.bytecode + deploymentData.slice(2)
+    });
+    
+    // Get current gas price
+    const feeData = await ethers.provider.getFeeData();
+    const gasPrice = feeData.gasPrice;
+    
+    // Calculate total cost
+    const estimatedCost = gasEstimate * gasPrice;
+    const estimatedCostInEth = ethers.formatEther(estimatedCost);
+    
+    console.log(`⛽ Estimated gas: ${gasEstimate.toString()}`);
+    console.log(`💵 Gas price: ${ethers.formatUnits(gasPrice, "gwei")} gwei`);
+    console.log(`💸 Estimated cost: ${estimatedCostInEth} SepoliaETH`);
+    
+    // Check if we have enough balance
+    if (balance < estimatedCost) {
+      const needed = estimatedCost - balance;
+      throw new Error(`Insufficient funds! Need ${ethers.formatEther(needed)} more SepoliaETH. Current balance: ${balanceInEth} SepoliaETH`);
+    }
+    
+    console.log("✅ Sufficient balance for deployment!");
+    const remaining = balance - estimatedCost;
+    console.log(`💰 Remaining after deployment: ${ethers.formatEther(remaining)} SepoliaETH`);
+
+    // Deploy the Voting contract
+    console.log("\n📦 Deploying Voting contract...");
+    const voting = await Voting.deploy(adminAddress);
   
   await voting.waitForDeployment();
   const contractAddress = await voting.getAddress();
@@ -116,6 +152,11 @@ export const DEPLOYMENT_INFO = ${JSON.stringify(deploymentInfo, null, 2)};
   console.log(`   npx hardhat verify --network sepolia ${contractAddress} ${adminAddress}`);
   console.log("2. Update your Vercel environment variables");
   console.log("3. Deploy your frontend to Vercel");
+  
+  } catch (error) {
+    console.error("❌ Deployment failed:", error);
+    throw error;
+  }
 }
 
 main()

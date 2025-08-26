@@ -20,16 +20,17 @@ function logSuccess(message) { log(colors.green, 'SUCCESS', message); }
 function logWarning(message) { log(colors.yellow, 'WARNING', message); }
 function logError(message) { log(colors.red, 'ERROR', message); }
 
-function runCommand(command, description) {
+function runCommand(command, description, timeoutMs = 300000) { // 5 minute default timeout
   return new Promise((resolve, reject) => {
     logInfo(description);
-    exec(command, (error, stdout, stderr) => {
+    
+    const child = exec(command, (error, stdout, stderr) => {
       if (error) {
         logError(`${description} failed: ${error.message}`);
         reject(error);
         return;
       }
-      if (stderr && !stderr.includes('warning')) {
+      if (stderr && !stderr.includes('warning') && !stderr.includes('npm warn')) {
         logError(`${description} stderr: ${stderr}`);
       }
       if (stdout) {
@@ -37,6 +38,17 @@ function runCommand(command, description) {
       }
       logSuccess(`${description} completed`);
       resolve(stdout);
+    });
+
+    // Set timeout
+    const timeout = setTimeout(() => {
+      child.kill('SIGTERM');
+      logError(`${description} timed out after ${timeoutMs/1000} seconds`);
+      reject(new Error(`Command timed out: ${command}`));
+    }, timeoutMs);
+
+    child.on('exit', () => {
+      clearTimeout(timeout);
     });
   });
 }
@@ -119,29 +131,42 @@ async function main() {
     
     // Step 4: Install frontend dependencies
     process.chdir(path.join(__dirname, '../frontend'));
-    await runCommand('npm install', 'Installing frontend dependencies');
+    await runCommand('bun install', 'Installing frontend dependencies');
     process.chdir(path.join(__dirname, '..'));
 
     // Step 5: Compile contracts
     await runCommand('npx hardhat compile', 'Compiling smart contracts');
 
-    // Step 6: Deploy to Sepolia
+    // Step 6: Check Sepolia balance first
+    logInfo("Checking Sepolia balance...");
+    await runCommand('npx hardhat run scripts/check-sepolia-balance.js --network sepolia', 'Checking Sepolia Balance');
+    
+    // Step 7: Deploy to Sepolia
     logInfo("Deploying contracts to Sepolia testnet...");
     await runCommand('npx hardhat run scripts/deploy-sepolia.js --network sepolia', 'Deploying to Sepolia');
 
-    // Step 7: Verify contracts (optional)
+    // Step 8: Wait for deployment to settle
+    logInfo("Waiting for deployment to settle...");
+    await new Promise(resolve => setTimeout(resolve, 5000));
+
+    // Step 9: Verify contracts (optional)
     try {
+      logInfo("Verifying contracts on Etherscan...");
       await runCommand('npx hardhat run scripts/verify-sepolia.js --network sepolia', 'Verifying contracts on Etherscan');
     } catch (error) {
       logWarning('Contract verification failed, but deployment continues');
     }
 
-    // Step 8: Build frontend
+    // Step 10: Build frontend
+    logInfo("Building frontend for production...");
     process.chdir(path.join(__dirname, '../frontend'));
-    await runCommand('npm run build', 'Building frontend for production');
+    await runCommand('bun run build', 'Building frontend for production');
+    
+    // Step 11: Deploy frontend (if not using Vercel CLI)
+    logInfo("Frontend built successfully!");
     process.chdir(path.join(__dirname, '..'));
 
-    // Step 9: Show deployment summary
+    // Step 12: Show deployment summary
     const deploymentPath = path.join(__dirname, '../deployments/sepolia.json');
     if (fs.existsSync(deploymentPath)) {
       const deploymentInfo = JSON.parse(fs.readFileSync(deploymentPath, 'utf8'));
@@ -153,15 +178,30 @@ async function main() {
       logSuccess(`Network: Sepolia Testnet`);
       logSuccess(`Explorer: https://sepolia.etherscan.io/address/${deploymentInfo.contractAddress}`);
       
-      console.log("\n📝 Next Steps:");
-      console.log("1. Deploy frontend to Vercel:");
+      console.log("\n📝 Frontend Deployment:");
+      console.log("✅ Frontend built successfully in './frontend/dist'");
+      console.log("✅ Environment variables updated automatically");
+      
+      console.log("\n🚀 Next Steps - Deploy to Vercel:");
+      console.log("1. Install Vercel CLI globally:");
+      console.log("   npm install -g vercel");
+      console.log("\n2. Deploy to Vercel:");
       console.log("   cd frontend");
       console.log("   vercel --prod");
-      console.log("\n2. Update frontend environment variables with deployed contract address");
-      console.log(`   VITE_CONTRACT_ADDRESS=${deploymentInfo.contractAddress}`);
-      console.log(`   VITE_ADMIN_ADDRESS=${deploymentInfo.adminAddress}`);
-      console.log("   VITE_CHAIN_ID=11155111");
-      console.log("   VITE_NETWORK_NAME=sepolia");
+      console.log("\n3. Or manually upload the 'dist' folder to your hosting provider");
+      
+      console.log("\n📋 Environment Variables for Vercel:");
+      console.log(`VITE_CONTRACT_ADDRESS=${deploymentInfo.contractAddress}`);
+      console.log(`VITE_ADMIN_ADDRESS=${deploymentInfo.adminAddress}`);
+      console.log(`VITE_CHAIN_ID=11155111`);
+      console.log(`VITE_NETWORK_NAME=sepolia`);
+      console.log(`VITE_INFURA_PROJECT_ID=${process.env.INFURA_PROJECT_ID || 'your-infura-project-id'}`);
+      
+      console.log("\n🎯 Deployment Summary:");
+      console.log("✅ Smart contracts deployed to Sepolia");
+      console.log("✅ Frontend built and ready");
+      console.log("✅ All configurations updated");
+      console.log("⏳ Manual step: Deploy frontend to Vercel");
     }
 
   } catch (error) {
