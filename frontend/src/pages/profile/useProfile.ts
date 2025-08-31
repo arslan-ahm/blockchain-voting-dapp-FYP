@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { updateUserDetails, requestVerification, registerForCampaign } from "../../store/thunks/userThunks";
 import { usePinata } from "../../hooks/usePinata";
-import { Role } from "../../types";
+import { Role, type Campaign } from "../../types";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { toast } from "sonner";
 import { fetchJsonFromIpfs } from "../../utils/ipfs";
@@ -39,23 +39,38 @@ export const useProfile = () => {
   const { uploadFile } = usePinata();
   const user = useAppSelector((state) => state.user);
   const { campaigns } = useAppSelector((state) => state.campaign);
+  // Add this line to get publicCampaignId from admin state
+  const { publicCampaignId } = useAppSelector((state) => state.admin);
   const [previewImageUrl, setPreviewImageUrl] = useState<string>("");
   const [supportiveLinks, setSupportiveLinks] = useState<string[]>([""]);
   const [isVerificationLoading, setIsVerificationLoading] = useState(false);
   const [isCampaignRegistrationLoading, setIsCampaignRegistrationLoading] = useState(false);
-  const { signer, provider } = useWallet();
+  const [selectedCampaignId, setSelectedCampaignId] = useState<number | null>(null);
+  const { signer } = useWallet();
   
   const isEditable = user.role === Role.Unverified || user.role === Role.PendingVerification;
 
   const now = Math.floor(Date.now() / 1000);
   const upcomingThreshold = 7 * 24 * 60 * 60; // 7 days
 
-  // Get relevant campaigns based on user's registration window
-  const relevantCampaign = campaigns
-    .filter((c) => c.isOpen || (c.startDate > now && c.startDate <= now + upcomingThreshold))
-    .sort((a, b) => a.startDate - b.startDate)[0];
+  // Get available campaigns for role application
+  const availableCampaigns = campaigns
+    .filter((c) => {
+      // Show campaigns that are open and either:
+      // 1. Currently active (started but not ended)
+      // 2. Starting within the next 7 days
+      const isActive = c.startDate <= now && c.endDate > now;
+      const isUpcoming = c.startDate > now && c.startDate <= now + upcomingThreshold;
+      return c.isOpen && !c.isDeleted && (isActive || isUpcoming);
+    })
+    .sort((a, b) => a.startDate - b.startDate);
 
-  const activeCampaigns = campaigns.filter((c) => c.isOpen);
+  // Get selected campaign or fallback to first available
+  const selectedCampaign = selectedCampaignId 
+    ? availableCampaigns.find(c => c.id === selectedCampaignId)
+    : availableCampaigns[0];
+
+  const activeCampaigns = campaigns.filter((c) => c.isOpen && c.startDate <= now && c.endDate > now);
   const upcomingCampaigns = campaigns.filter((c) => 
     c.startDate > now && 
     c.startDate <= now + upcomingThreshold && 
@@ -64,42 +79,9 @@ export const useProfile = () => {
 
   const hasActiveCampaign = activeCampaigns.length > 0;
   const hasUpcomingCampaign = upcomingCampaigns.length > 0;
-  const canUpdateProfile = !!relevantCampaign && isEditable;
+  const canUpdateProfile = !!selectedCampaign && isEditable;
 
-  // Check if user is already registered for a campaign
-  // const isUserRegisteredForCampaign = (campaignId: number) => {
-  //   // This would need to be fetched from the contract
-  //   // For now, we'll assume it's stored in the campaign state
-  //   const campaign = campaigns.find(c => parseInt(c.campaignId) === campaignId);
-  //   return campaign?.voters?.includes(user.account) || 
-  //          campaign?.candidates?.includes(user.account);
-  // };
-
-  // Check if user can register for campaign based on role and timing
-  const canRegisterForCampaign = (campaignId: number) => {
-    const campaign = campaigns.find(c => c.id === campaignId);
-    if (!campaign) return false;
-
-    const campaignStartTime = campaign.startDate;
-    const campaignEndTime = campaign.endDate;
-    const isRegistrationPeriod = now < campaignEndTime && 
-      (now <= campaignStartTime || 
-       (now >= campaignStartTime && now < campaignEndTime));
-
-    // Check if user has a verified role
-    const hasValidRole = user.role === Role.Voter || user.role === Role.Candidate;
-    
-    // Candidates can only register before campaign starts
-    const canCandidateRegister = user.role === Role.Candidate ? now < campaignStartTime : true;
-    
-    return hasValidRole && 
-           isRegistrationPeriod && 
-           canCandidateRegister && 
-          //  !isUserRegisteredForCampaign(campaignId) &&
-           campaign.isOpen;
-  };
-
-  const getCampaignName = async (campaign: typeof relevantCampaign) => {
+  const getCampaignName = async (campaign: Campaign) => {
     if (!campaign) return "";
     
     if (campaign.detailsIpfsHash) {
@@ -321,6 +303,12 @@ export const useProfile = () => {
         toast.error("Please complete your basic details first");
         return;
       }
+
+      // Validate that a campaign is selected
+      if (!selectedCampaignId) {
+        toast.error("Please select a campaign first");
+        return;
+      }
   
       if (!signer) {
         toast.error("Wallet not connected");
@@ -382,8 +370,9 @@ export const useProfile = () => {
           signer
         })
       ).unwrap();
-  
-      toast.success("Profile updated and verification request submitted successfully");
+
+      
+      
       verificationForm.reset();
       setSupportiveLinks([""]);
       
@@ -399,14 +388,52 @@ export const useProfile = () => {
     }
   };
 
-  // Campaign registration function
-  const registerForCampaignById = async (campaignId: number) => {
-    if (!canRegisterForCampaign(campaignId)) {
-      toast.error("You cannot register for this campaign");
+  const canRegisterForCampaign = useCallback((campaignId: number): boolean => {
+  const campaign = campaigns.find(c => c.id === campaignId);
+  if (!campaign) return false;
+  
+  // Check if campaign is deleted or closed
+  if (campaign.isDeleted || !campaign.isOpen) return false;
+  
+  // Check campaign timing
+  const now = Math.floor(Date.now() / 1000);
+  const isActive = campaign.startDate <= now && campaign.endDate > now;
+  const isUpcoming = campaign.startDate > now;
+  const hasValidTiming = isActive || isUpcoming;
+  
+  if (!hasValidTiming) return false;
+  
+  // User must have approved role (Voter or Candidate) to register for campaigns
+  const hasEligibleRole = user.role === Role.Voter || user.role === Role.Candidate;
+  
+  return hasEligibleRole && hasValidTiming && campaign.isOpen && !campaign.isDeleted;
+}, [campaigns, user.role]);
+
+  // Campaign registration function - now uses selected campaign
+  const registerForSelectedCampaign = async () => {
+    if (!selectedCampaign) {
+      toast.error("No campaign selected");
       return;
     }
 
-    if (!provider) {
+    // Check if user has proper role for registration
+    if (user.role !== Role.Voter && user.role !== Role.Candidate) {
+      if (user.role === Role.PendingVerification) {
+        toast.error("Please wait for admin approval before registering for campaigns");
+      } else if (user.role === Role.Unverified) {
+        toast.error("Please complete verification first before registering for campaigns");
+      } else {
+        toast.error("Invalid role for campaign registration");
+      }
+      return;
+    }
+
+    if (!canRegisterForCampaign(selectedCampaign.id)) {
+      toast.error("This campaign is not available for registration");
+      return;
+    }
+
+    if (!signer) {
       toast.error("Wallet not connected");
       return;
     }
@@ -415,8 +442,8 @@ export const useProfile = () => {
     try {
       await dispatch(
         registerForCampaign({
-          campaignId,
-          provider
+          campaignId: selectedCampaign.id,
+          signer
         })
       ).unwrap();
 
@@ -433,57 +460,75 @@ export const useProfile = () => {
     }
   };
 
-  // Auto-register for relevant campaign (if user wants)
-  const autoRegisterForRelevantCampaign = async () => {
-    if (relevantCampaign && canRegisterForCampaign(relevantCampaign.id)) {
-      await registerForCampaignById(relevantCampaign.id);
-    }
-  };
-
-  // Get user's registration status for campaigns
-  const getUserCampaignStatus = () => {
-    const status = {
-      canVote: false,
-      canCandidate: false,
-      registeredCampaigns: [] as number[],
-      availableCampaigns: [] as number[],
-    };
-
-    campaigns.forEach(campaign => {
-      // const isRegistered = isUserRegisteredForCampaign(parseInt(campaign.id));
-      const canRegister = canRegisterForCampaign(campaign.id);
-
-      // if (isRegistered) {
-      //   status.registeredCampaigns.push(parseInt(campaign.id));
-      // }
-
-      if (canRegister) {
-        status.availableCampaigns.push(campaign.id);
-      }
-    });
-
-    status.canVote = user.role === Role.Voter;
-    status.canCandidate = user.role === Role.Candidate;
-
-    return status;
-  };
-
-  // Check if user needs to complete profile for campaign participation
-  const needsProfileCompletion = () => {
-    if (user.role === Role.Unverified || user.role === Role.PendingVerification) {
-      return {
-        needsBasicDetails: !user.details?.name || !user.details?.email,
-        needsVerification: user.role === Role.Unverified,
-        message: user.role === Role.Unverified 
-          ? "Complete your profile and request verification to participate in campaigns"
-          : "Your verification is pending. You'll be able to participate once approved."
-      };
-    }
+  // Get campaign metadata for display
+  const getCampaignMetadata = (campaign: typeof selectedCampaign) => {
+    if (!campaign) return null;
+    
+    const startDate = new Date(campaign.startDate * 1000);
+    const isActive = campaign.startDate <= now && campaign.endDate > now;
+    const isUpcoming = campaign.startDate > now;
+    const isLive = publicCampaignId === campaign.id; // Add this line
+    
     return {
-      needsBasicDetails: false,
-      needsVerification: false,
-      message: ""
+      id: campaign.id,
+      title: campaign.title,
+      description: campaign.description,
+      startDate: startDate.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      }),
+      startRelativeTime: isActive ? 'Active' : isUpcoming ? `Starts ${getRelativeTime(startDate)}` : 'Ended',
+      status: isActive ? 'Active' : isUpcoming ? 'Upcoming' : 'Ended',
+      isLive, // Add this line
+      duration: `${Math.ceil((campaign.endDate - campaign.startDate) / (24 * 60 * 60))} days`
     };
+  };
+
+  // Helper function for relative time
+  const getRelativeTime = (date: Date) => {
+    const diffInSeconds = Math.floor((date.getTime() - Date.now()) / 1000);
+    const diffInDays = Math.floor(diffInSeconds / (24 * 60 * 60));
+    
+    if (diffInDays > 0) {
+      return `in ${diffInDays} day${diffInDays > 1 ? 's' : ''}`;
+    } else if (diffInDays === 0) {
+      const diffInHours = Math.floor(diffInSeconds / (60 * 60));
+      return diffInHours > 0 ? `in ${diffInHours} hour${diffInHours > 1 ? 's' : ''}` : 'soon';
+    }
+    return 'recently';
+  };
+
+  // Legacy function for backward compatibility
+  const registerForCampaignById = async (campaignId: number) => {
+    const campaign = campaigns.find(c => c.id === campaignId);
+    if (!campaign) {
+      toast.error("Campaign not found");
+      return;
+    }
+    
+    setSelectedCampaignId(campaignId);
+    await registerForSelectedCampaign();
+  };
+
+  // Get user campaign status
+  const getUserCampaignStatus = (campaignId: number) => {
+    const campaign = campaigns.find(c => c.id === campaignId);
+    if (!campaign) return null;
+    
+    return {
+      isRegistered: false, // This would need to be fetched from contract
+      canRegister: canRegisterForCampaign(campaignId),
+      campaign
+    };
+  };
+
+  // Check if profile completion is needed
+  const needsProfileCompletion = () => {
+    if (!user.details) return true;
+    
+    const requiredFields = ['name', 'email', 'dateOfBirth', 'identityNumber', 'contactNumber'];
+    return requiredFields.some(field => !user.details?.[field as keyof typeof user.details]);
   };
 
   return {
@@ -502,12 +547,19 @@ export const useProfile = () => {
     updateSupportiveLink,
     isVerificationLoading,
     
-    // Campaign Registration
-    registerForCampaignById,
-    autoRegisterForRelevantCampaign,
+    // Campaign Selection & Registration
+    availableCampaigns,
+    selectedCampaign,
+    selectedCampaignId,
+    setSelectedCampaignId,
+    registerForSelectedCampaign,
     isCampaignRegistrationLoading,
     canRegisterForCampaign,
-    // isUserRegisteredForCampaign,
+    getCampaignMetadata,
+    
+    // Legacy support
+    registerForCampaignById,
+    autoRegisterForRelevantCampaign: registerForSelectedCampaign,
     getUserCampaignStatus,
     needsProfileCompletion,
     
@@ -517,11 +569,14 @@ export const useProfile = () => {
     hasActiveCampaign,
     hasUpcomingCampaign,
     canUpdateProfile,
-    relevantCampaign,
+    relevantCampaign: selectedCampaign, // For backward compatibility
     getCampaignName,
     activeCampaigns,
     upcomingCampaigns,
     watchedValues,
-    previewImageUrl,
+    publicCampaignId,
+    previewImageUrl, // Add this line
   };
 };
+
+// Add this function before the return statement (around line 485)

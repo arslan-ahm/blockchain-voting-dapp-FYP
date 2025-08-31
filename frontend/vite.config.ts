@@ -6,12 +6,8 @@ import { NodeGlobalsPolyfillPlugin } from '@esbuild-plugins/node-globals-polyfil
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
-  // Load environment variables from .env files
-  const env = loadEnv(mode, process.cwd(), '');
-  
-  // Determine which environment file to use
-  const envFile = mode === 'production' ? '.env.production' : '.env.development';
-  console.log(`Loading environment from: ${envFile} (mode: ${mode})`);
+  // Load env file from current directory (for environment variables)
+  loadEnv(mode, process.cwd(), '');
   
   return {
     plugins: [react(), tailwindcss(), NodeGlobalsPolyfillPlugin({

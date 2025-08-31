@@ -2,13 +2,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "../ui/dialog";
-import {
   TrendingUp,
   AlertCircle,
   Calendar,
@@ -17,20 +10,17 @@ import {
   FileText,
   ExternalLink,
   FileImage,
-  Download,
 } from "lucide-react";
 import type { Campaign } from "../../types";
 import { EmptyState } from "./EmptyState";
 import { cn } from "../../utils/cn";
 import { getCampaignStatusBadgeColor } from "../../utils/helpers";
-import { useState } from "react";
 import {
   formatDuration,
   getCampaignRelativeTime,
 } from "../../utils/formatters";
 
 export const CampaignStats = ({ campaign }: { campaign?: Campaign | null }) => {
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   if (!campaign) {
     return (
@@ -75,11 +65,8 @@ export const CampaignStats = ({ campaign }: { campaign?: Campaign | null }) => {
   const handleViewDetails = () => {
     if (!ipfsUrl) return;
 
-    if (fileType === "pdf") {
-      window.open(ipfsUrl, "_blank");
-    } else {
-      setIsDialogOpen(true);
-    }
+    // Always open in new tab for all file types
+    window.open(ipfsUrl, "_blank");
   };
 
   return (
@@ -228,75 +215,24 @@ export const CampaignStats = ({ campaign }: { campaign?: Campaign | null }) => {
         {/* Campaign Details Button */}
         {campaign.detailsIpfsHash && (
           <div className="pt-4 border-t border-gray-600">
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button
-                  onClick={handleViewDetails}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
-                >
-                  {fileType === "pdf" ? (
-                    <>
-                      <FileText className="w-4 h-4" />
-                      View Campaign Contract (PDF)
-                      <ExternalLink className="w-4 h-4" />
-                    </>
-                  ) : (
-                    <>
-                      <FileImage className="w-4 h-4" />
-                      View Campaign Details
-                    </>
-                  )}
-                </Button>
-              </DialogTrigger>
-
-              {fileType !== "pdf" && (
-                <DialogContent className="max-w-4xl max-h-[80vh] bg-gray-800 border-gray-700">
-                  <DialogHeader>
-                    <DialogTitle className="text-white flex items-center gap-2">
-                      <FileImage className="w-5 h-5" />
-                      Campaign Details
-                    </DialogTitle>
-                  </DialogHeader>
-                  <div className="mt-4 flex flex-col items-center space-y-4">
-                    {ipfsUrl && (
-                      <>
-                        <img
-                          src={ipfsUrl}
-                          alt="Campaign Details"
-                          className="max-w-full max-h-96 object-contain rounded-lg border border-gray-600"
-                          onError={(e) => {
-                            e.currentTarget.style.display = "none";
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={() => window.open(ipfsUrl, "_blank")}
-                            variant="outline"
-                            className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                          >
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Open in New Tab
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              const link = document.createElement("a");
-                              link.href = ipfsUrl;
-                              link.download = `campaign-${campaign.id}-details`;
-                              link.click();
-                            }}
-                            variant="outline"
-                            className="border-gray-600 text-gray-300 hover:bg-gray-700"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download
-                          </Button>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                </DialogContent>
+            <Button
+              onClick={handleViewDetails}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white flex items-center gap-2"
+            >
+              {fileType === "pdf" ? (
+                <>
+                  <FileText className="w-4 h-4" />
+                  View Campaign Contract (PDF)
+                  <ExternalLink className="w-4 h-4" />
+                </>
+              ) : (
+                <>
+                  <FileImage className="w-4 h-4" />
+                  View Campaign Details
+                  <ExternalLink className="w-4 h-4" />
+                </>
               )}
-            </Dialog>
+            </Button>
           </div>
         )}
       </CardContent>

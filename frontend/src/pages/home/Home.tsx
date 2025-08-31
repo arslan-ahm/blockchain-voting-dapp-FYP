@@ -96,10 +96,10 @@ export const Home = () => {
         <div className="container px-4 md:px-8 mx-auto">
           <div className="max-w-4xl mx-auto">
             <h2 className="section-title text-3xl md:text-4xl font-bold mb-6 text-white text-center">
-              About <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">BlockVote</span>
+              About <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">VoteLedger</span>
             </h2>
             <p className="section-description text-sm min-[375px]:text-md sm:text-lg md:text-xl text-gray-300 mb-8 text-center">
-              BlockVote represents a revolutionary approach to digital democracy, leveraging the security and transparency of blockchain technology to create a voting platform that's immune to tampering, fraud, and manipulation.
+              VoteLedger represents a revolutionary approach to digital democracy, leveraging the security and transparency of blockchain technology to create a voting platform that's immune to tampering, fraud, and manipulation.
             </p>
             <div className="grid md:grid-cols-2 gap-8">
               <div className="backdrop-blur-sm rounded-xl p-6 border border-purple-500/20 hover:scale-105 hover:shadow-neon-purple transition-all duration-300">
@@ -126,7 +126,7 @@ export const Home = () => {
             Platform <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Features</span>
           </h2>
           <p className="text-gray-300 mb-12 text-center max-w-3xl mx-auto text-sm min-[375px]:text-md sm:text-lg md:text-xl">
-            BlockVote combines cutting-edge blockchain technology with a user-friendly interface to deliver a voting platform that's as secure as it is easy to use.
+            VoteLedger combines cutting-edge blockchain technology with a user-friendly interface to deliver a voting platform that's as secure as it is easy to use.
           </p>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -225,7 +225,7 @@ export const Home = () => {
             Project <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Roadmap</span>
           </h2>
           <p className="text-gray-300 mb-16 text-center max-w-3xl mx-auto text-sm min-[375px]:text-md sm:text-lg md:text-xl">
-            Our development roadmap outlines our vision for the future of BlockVote and the key milestones we're working toward.
+            Our development roadmap outlines our vision for the future of VoteLedger and the key milestones we're working toward.
           </p>
           
           <div className="max-w-4xl mx-auto">

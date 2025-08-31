@@ -1,5 +1,11 @@
 .custom-datepicker-popper {
-  z-index: 1000;
+  z-index: 9999 !important;
+  position: fixed !important;
+}
+
+/* Ensure react-datepicker popper has high z-index */
+.react-datepicker-popper {
+  z-index: 9999 !important;
 }
 
 .custom-datepicker-calendar {
@@ -23,10 +29,21 @@
 }
 
 .react-datepicker__current-month {
-  color: rgb(229, 231, 235) !important;
+  color: white !important;
   font-size: 16px !important;
   font-weight: 600 !important;
   margin-bottom: 8px !important;
+}
+
+/* Ensure all header text is white */
+.react-datepicker__header * {
+  color: white !important;
+}
+
+/* Specific targeting for dropdowns in header */
+.react-datepicker__header .react-datepicker__year-read-view,
+.react-datepicker__header .react-datepicker__month-read-view {
+  color: white !important;
 }
 
 .react-datepicker__day-names {
@@ -174,11 +191,41 @@
   border: 1px solid rgb(75, 85, 99) !important;
   border-radius: 6px !important;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3) !important;
+  color: white !important;
+}
+
+/* Year dropdown container */
+.react-datepicker__year-dropdown-container {
+  color: white !important;
+}
+
+/* Year read view (the clickable year text) */
+.react-datepicker__year-read-view,
+.react-datepicker__month-read-view {
+  color: white !important;
+  background: transparent !important;
+  border: none !important;
+  padding: 4px 8px !important;
+}
+
+.react-datepicker__year-read-view:hover,
+.react-datepicker__month-read-view:hover {
+  color: rgb(147, 197, 253) !important;
+  background: rgba(59, 130, 246, 0.1) !important;
+}
+
+/* Year dropdown arrow */
+.react-datepicker__year-read-view--down-arrow,
+.react-datepicker__month-read-view--down-arrow {
+  border-top-color: white !important;
+  border-left-color: transparent !important;
+  border-right-color: transparent !important;
+  border-bottom-color: transparent !important;
 }
 
 .react-datepicker__year-option,
 .react-datepicker__month-option {
-  color: rgb(229, 231, 235) !important;
+  color: white !important;
   background: transparent !important;
   padding: 8px 12px !important;
   transition: all 0.2s ease !important;
@@ -190,7 +237,19 @@
   color: rgb(147, 197, 253) !important;
 }
 
-.react-datepicker__year-option--selected,
+/* .react-datepicker__year-option--selected, */
+.react-datepicker__month-option--selected {
+  background: linear-gradient(
+    to right,
+    rgb(59, 130, 246),
+    rgb(147, 51, 234)
+  ) !important;
+  color: white !important;
+  border: 2px solid rgb(59, 130, 246) !important;
+  border-radius: 6px !important;
+  margin: 2px !important;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.3) !important;
+}
 .react-datepicker__month-option--selected {
   background: linear-gradient(
     to right,
@@ -211,6 +270,7 @@
   height: 100% !important;
   max-height: 250px !important;
   overflow-y: hidden !important;
+  overflow-x: hidden !important;
   background: rgb(55, 65, 81) !important;
   border-left: 1px solid rgb(75, 85, 99) !important;
 }
@@ -219,6 +279,8 @@
   height: 100% !important;
   max-height: 250px !important;
   background: rgb(55, 65, 81) !important;
+  overflow-x: hidden !important;
+  width: 100% !important;
 }
 
 .react-datepicker__time-list {
@@ -226,13 +288,21 @@
   height: 100% !important;
   max-height: 250px !important;
   overflow-y: auto !important;
+  overflow-x: hidden !important;
+  width: 100% !important;
 }
 
 .react-datepicker__time-list-item {
   color: rgb(229, 231, 235) !important;
   background: transparent !important;
-  padding: 8px 12px !important;
+  padding: 6px 8px !important;
   transition: all 0.2s ease !important;
+  white-space: nowrap !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .react-datepicker__time-list-item:hover {
@@ -259,6 +329,12 @@
   color: rgb(229, 231, 235) !important;
   font-weight: 500 !important;
   margin-bottom: 8px !important;
+  text-align: center !important;
+  font-size: 12px !important;
+  padding: 4px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
 }
 
 .react-datepicker-time__input {
@@ -266,9 +342,12 @@
   border: 1px solid rgb(107, 114, 128) !important;
   border-radius: 6px !important;
   color: rgb(229, 231, 235) !important;
-  padding: 8px 12px !important;
+  padding: 6px 8px !important;
   width: 100% !important;
   transition: all 0.2s ease !important;
+  font-size: 12px !important;
+  text-align: center !important;
+  box-sizing: border-box !important;
 }
 
 .react-datepicker-time__input:focus {
@@ -287,6 +366,13 @@
 
 .react-datepicker {
   display: flex !important;
+  overflow-x: hidden !important;
+}
+
+/* Ensure time container and calendar don't cause horizontal overflow */
+.react-datepicker__month-container {
+  flex: 1 !important;
+  min-width: 0 !important;
 }
 
 .react-datepicker__navigation--previous .react-datepicker__navigation-icon::before {

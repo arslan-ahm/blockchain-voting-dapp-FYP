@@ -10,7 +10,6 @@ import { Loader2 } from "lucide-react";
 
 function App() {
   const { isInitializing } = useStart();
-  console.log('Admin =>', isInitializing);
   if (isInitializing) {
     return (
       <ThemeProvider defaultTheme="dark">

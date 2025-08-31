@@ -18,6 +18,7 @@ import {
   fetchVerificationRequests,
   setPublicCampaignForDisplay,
   checkAndAutoSelectUrgentCampaign,
+  fetchPublicCampaign, // Add this import
 } from "../../store/thunks/adminThunks";
 
 import {
@@ -33,6 +34,7 @@ import {
   selectPublicCampaignId,
   selectAutoSelectUrgent,
   selectPublicCampaign,
+  selectFetchingVerificationRequests, // Add this
   setSelectedCampaign,
   setAutoSelectUrgent,
 } from "../../store/slices/adminSlice";
@@ -47,14 +49,18 @@ const campaignSchema = z
     description: z.string().min(1, "Description is required"),
     startDate: z
       .number()
-      .min(Math.floor(Date.now() / 1000), "Start date must be in the future"),
+      .min(Math.floor((Date.now() + 10 * 60 * 1000) / 1000), "Start time must be at least 10 minutes from now"),
     endDate: z.number(),
     campaignDetails: z.string().min(1, "Campaign rules are required"),
     campaignDocument: z.instanceof(File).optional(),
     feedback: z.string().optional(),
   })
   .refine((data) => data.endDate > data.startDate, {
-    message: "End date must be after start date",
+    message: "End time must be after start time",
+    path: ["endDate"],
+  })
+  .refine((data) => (data.endDate - data.startDate) >= 3600, {
+    message: "Campaign must run for at least 1 hour",
     path: ["endDate"],
   });
 
@@ -73,6 +79,7 @@ export const useAdminDashboard = () => {
   const creatingCampaign = useAppSelector(selectCreatingCampaign);
   const deletingCampaign = useAppSelector(selectDeletingCampaign);
   const closingCampaign = useAppSelector(selectClosingCampaign);
+  const fetchingVerificationRequests = useAppSelector(selectFetchingVerificationRequests);
   const { verificationRequests } = useAppSelector((state) => ({
     verificationRequests: state.admin.verificationRequests || [],
   }));
@@ -117,12 +124,20 @@ export const useAdminDashboard = () => {
     }
   }, [dispatch, provider, signer]);
 
-  // Set default selected campaign
+  useEffect(() => {
+        if (provider && account) {
+          dispatch(fetchPublicCampaign({ provider }));
+        }
+      }, [dispatch, provider, account]);
+
+  // Set default selected campaign - prefer public campaign, but allow independent selection
   useEffect(() => {
     if (campaigns.length > 0 && selectedCampaignId === 0) {
-      dispatch(setSelectedCampaign(campaigns[0].id));
+      // Default to public campaign if it exists, otherwise first campaign
+      const defaultCampaignId = publicCampaignId !== 0 ? publicCampaignId : campaigns[0].id;
+      dispatch(setSelectedCampaign(defaultCampaignId));
     }
-  }, [campaigns, selectedCampaignId, dispatch]);
+  }, [campaigns, selectedCampaignId, publicCampaignId, dispatch]);
 
   // Fetch data for the selected campaign
   useEffect(() => {
@@ -402,23 +417,31 @@ export const useAdminDashboard = () => {
     ].filter((item) => item.value > 0);
   };
 
-  // Enhanced campaign selection handler
+  // Enhanced campaign selection handler - only for viewing data
+  // NOTE: This is completely independent of the public/live campaign setting
   const handleSelectCampaign = async (campaignId: number) => {
-    dispatch(setSelectedCampaign(campaignId));
+  // This only changes what data is displayed on dashboard
+  dispatch(setSelectedCampaign(campaignId));
   };
 
-  // Handle public campaign selection
+  // Handle public campaign selection - only for live/public status
+  // Update the handleSetPublicCampaign function (around line 420)
   const handleSetPublicCampaign = async (campaignId: number) => {
-    if (!signer) {
-      toast.error("Please connect your wallet to set public campaign");
-      return;
-    }
-
-    try {
-      await dispatch(setPublicCampaignForDisplay({ campaignId, signer })).unwrap();
-    } catch (error) {
-      console.error("Failed to set public campaign:", error);
-    }
+  if (!signer) {
+  toast.error("Please connect your wallet to set public campaign");
+  return;
+  }
+  
+  try {
+  // This changes which campaign is live/public
+  await dispatch(setPublicCampaignForDisplay({ campaignId, signer })).unwrap();
+  
+  // Don't auto-select the campaign - let user choose independently
+  
+  toast.success("Campaign is now live on the public page");
+  } catch (error) {
+  console.error("Failed to set public campaign:", error);
+  }
   };
 
   // Toggle auto-select urgent campaigns
@@ -484,39 +507,79 @@ export const useAdminDashboard = () => {
     }
   };
 
-  const handleCreateCampaign = async (values: CampaignFormData) => {
-    if (!signer || !account || !provider)
-      return toast.error("Please connect your wallet.");
-
-    let campaignDetailsIpfsHash = "";
-    if (values.campaignDetails || values.campaignDocument) {
-      const contentToUpload = values.campaignDocument || values.campaignDetails;
-      campaignDetailsIpfsHash = await handleUploadDocument(
-        contentToUpload,
-        values.startDate,
-        values.endDate
-      );
-      if (!campaignDetailsIpfsHash) return;
+  // Add this state near other local state declarations
+  const [uploadedDocumentHash, setUploadedDocumentHash] = useState<string | null>(null);
+  
+  // Create a separate function for immediate document upload
+  const handleImmediateDocumentUpload = async (file: File): Promise<string> => {
+  setIsUploading(true);
+  try {
+    const ipfsHash = await uploadFile(file);
+    
+    if (!ipfsHash) {
+      throw new Error("IPFS upload returned empty hash");
     }
-
-    const campaignData = {
-      title: values.title,
-      description: values.description,
-      startDate: values.startDate,
-      endDate: values.endDate,
-      detailsIpfsHash: campaignDetailsIpfsHash,
-      signer,
-    };
-
-    console.log("Campaign data being sent:", campaignData);
-    console.log("IPFS Hash:", campaignDetailsIpfsHash);
-    await dispatch(adminCreateCampaign(campaignData)).unwrap();
-    toast.success("Campaign created successfully");
-    campaignForm.reset();
-    setShowCreateModal(false);
-    dispatch(fetchAllCampaignIds({ provider }));
+    
+    console.log("Document uploaded immediately. IPFS Hash:", ipfsHash);
+    toast.success("Document uploaded successfully");
+    setUploadedDocumentHash(ipfsHash);
+    return ipfsHash;
+  } catch (error) {
+    console.error("Failed to upload document:", error);
+    toast.error("Failed to upload document");
+    throw error;
+  } finally {
+    setIsUploading(false);
+  }
   };
-
+  
+  // Update handleCreateCampaign to use the pre-uploaded hash
+  const handleCreateCampaign = async (values: CampaignFormData) => {
+  if (!signer || !account || !provider)
+    return toast.error("Please connect your wallet.");
+  
+  let campaignDetailsIpfsHash = "";
+  
+  // Only use the pre-uploaded document hash - remove fallback upload
+  if (uploadedDocumentHash) {
+    campaignDetailsIpfsHash = uploadedDocumentHash;
+  } else {
+    // If no document was uploaded, create campaign without document
+    toast.error("Campaign requested without any document.");
+    // You can choose to either:
+    // 1. Prevent campaign creation: return;
+    // 2. Or allow creation without document (current behavior)
+  }
+  
+  // Remove this fallback upload code that causes issues:
+  // else if (values.campaignDetails && values.campaignDetails.trim()) {
+  //   campaignDetailsIpfsHash = await handleUploadDocument(
+  //     values.campaignDetails,
+  //     values.startDate,
+  //     values.endDate
+  //   );
+  //   if (!campaignDetailsIpfsHash) return;
+  // }
+  
+  const campaignData = {
+    title: values.title,
+    description: values.description,
+    startDate: values.startDate,
+    endDate: values.endDate,
+    detailsIpfsHash: campaignDetailsIpfsHash,
+    signer,
+  };
+  
+  console.log("Campaign data being sent:", campaignData);
+  console.log("IPFS Hash:", campaignDetailsIpfsHash);
+  await dispatch(adminCreateCampaign(campaignData)).unwrap();
+  toast.success("Campaign created successfully");
+  campaignForm.reset();
+  setShowCreateModal(false);
+  setUploadedDocumentHash(null); // Reset the uploaded hash
+  dispatch(fetchAllCampaignIds({ provider }));
+  };
+  
   const handleDeleteCampaign = async (campaignId: number) => {
     if (!signer || !account || !provider)
       return toast.error("Please connect your wallet.");
@@ -558,22 +621,19 @@ export const useAdminDashboard = () => {
       ).unwrap();
       toast.success("Verification processed successfully");
       
-      // Refresh verification requests
+      // Only refresh verification requests - remove other API calls to prevent infinite loops
       dispatch(fetchVerificationRequests({ signer }));
       
-      // Refresh current campaign data to show updated participants
-      if (selectedCampaignId) {
-        dispatch(fetchAdminDashboardData({ 
-          campaignId: selectedCampaignId, 
-          signer,
-          forceRefresh: true
-        }));
-      }
-      
-      // Also refresh all campaign IDs to ensure consistency
-      if (provider) {
-        dispatch(fetchAllCampaignIds({ provider }));
-      }
+      // Remove these lines that cause infinite API calls:
+      // dispatch(fetchAdminDashboardData({ 
+      //   campaignId: selectedCampaignId, 
+      //   signer,
+      //   forceRefresh: true
+      // }));
+      // 
+      // if (provider) {
+      //   dispatch(fetchAllCampaignIds({ provider }));
+      // }
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "An unknown error occurred.";
@@ -625,6 +685,9 @@ export const useAdminDashboard = () => {
     closingCampaign,
     processingVerification,
     handleUploadDocument,
+    handleImmediateDocumentUpload, // Add this line
+    uploadedDocumentHash, // Add this line
+    fetchingVerificationRequests, // Add this to return
 
     // Dashboard Stats & Chart Data
     dashboardStats,

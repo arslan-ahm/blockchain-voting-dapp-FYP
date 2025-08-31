@@ -1,6 +1,7 @@
 import React, { forwardRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import "../styles/datepicker.css";
 import { CalendarIcon, Clock } from "lucide-react";
 import { cn } from "../utils/cn";
 

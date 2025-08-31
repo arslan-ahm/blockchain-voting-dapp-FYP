@@ -1077,7 +1077,25 @@ export const setPublicCampaignForDisplay = createAsyncThunk(
         signer
       );
 
-      // Call the contract function to set the active campaign for public display
+      // Validate contract
+      const isValidContract = await validateContract(contract);
+      if (!isValidContract) {
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
+      }
+
+      // Check if user is admin
+      const signerAddress = await signer.getAddress();
+      const contractAdmin = await contract.admin.staticCall();
+
+      if (signerAddress.toLowerCase() !== contractAdmin.toLowerCase()) {
+        return rejectWithValue(
+          "Access denied: Only admin can set public campaign"
+        );
+      }
+
+      // Call the contract function to set the public campaign
       const tx = await contract.switchToCampaign(campaignId);
       await tx.wait();
 
@@ -1087,6 +1105,35 @@ export const setPublicCampaignForDisplay = createAsyncThunk(
       console.error("Failed to set public campaign:", error);
       const errorMessage = handleContractError(error);
       toast.error(`Failed to set public campaign: ${errorMessage}`);
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+// Get public campaign from contract
+export const fetchPublicCampaign = createAsyncThunk(
+  "admin/fetchPublicCampaign",
+  async ({ provider }: { provider: ethers.Provider }, { rejectWithValue }) => {
+    try {
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        provider
+      );
+
+      // Validate contract
+      const isValidContract = await validateContract(contract);
+      if (!isValidContract) {
+        return rejectWithValue(
+          "Contract not found or invalid. Please check the contract address and deployment."
+        );
+      }
+
+      const publicCampaignId = await contract.getPublicCampaignId.staticCall();
+      return Number(publicCampaignId.toString());
+    } catch (error) {
+      console.error("Failed to fetch public campaign:", error);
+      const errorMessage = handleContractError(error);
       return rejectWithValue(errorMessage);
     }
   }
@@ -1122,7 +1169,7 @@ export const checkAndAutoSelectUrgentCampaign = createAsyncThunk(
       .sort((a, b) => (a.startDate || 0) - (b.startDate || 0)); // Sort by start date
     
     if (urgentCampaigns.length > 0) {
-      // Auto-select the most urgent campaign for public display
+      // Only set as public/live campaign, don't change selection
       const urgentCampaignId = urgentCampaigns[0].id;
       dispatch({ type: "admin/setPublicCampaign", payload: urgentCampaignId });
       return urgentCampaignId;

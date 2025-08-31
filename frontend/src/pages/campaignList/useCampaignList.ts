@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from "react";
+import { useEffect, useCallback, useState, useMemo } from "react";
 import { useAppDispatch, useAppSelector } from "../../hooks/useRedux";
 import { 
   fetchNearbyCampaigns,
@@ -7,12 +7,14 @@ import {
   getAllCandidateVotes,
   registerForCampaign,
   getCampaignParticipants,
-  castVoteWithRoleCheck
+  castVoteWithRoleCheck,
+  getUserVote as fetchUserVote
 } from "../../store/thunks/campaignThunks";
 import { resetVoteStatus, clearError } from "../../store/slices/campaignSlice";
-import { selectPublicCampaignId, selectPublicCampaign } from "../../store/slices/adminSlice";
 import { useWallet } from "../../hooks/useWallet";
 import { Role } from "../../types";
+import { ethers } from "ethers";
+import { VOTING_CONTRACT_ABI, VOTING_CONTRACT_ADDRESS } from "../../constants/contract";
 
 interface UseCampaignListProps {
   userAddress?: string;
@@ -48,30 +50,48 @@ export const useCampaignList = ({
   // Get user's global role for enhanced voting logic
   const userRole = useAppSelector((state) => state.user.role);
   
-  // Get admin-selected public campaign
-  const publicCampaignId = useAppSelector(selectPublicCampaignId);
-  const publicCampaign = useAppSelector(selectPublicCampaign);
+  // Get admin-selected public campaign from contract
+  const [publicCampaignId, setPublicCampaignId] = useState<number>(0);
+  
+  // Fetch public campaign ID from contract
+  const fetchPublicCampaignId = useCallback(async () => {
+    if (!provider) return;
+    
+    try {
+      const contract = new ethers.Contract(
+        VOTING_CONTRACT_ADDRESS,
+        VOTING_CONTRACT_ABI,
+        provider
+      );
+      
+      const campaignId = await contract.getPublicCampaignId.staticCall();
+      setPublicCampaignId(Number(campaignId.toString()));
+    } catch (error) {
+      console.error("Failed to fetch public campaign ID:", error);
+    }
+  }, [provider]);
 
-  // Filter campaigns based on admin selection
+  // Filter campaigns based on admin selection from contract
   const getDisplayCampaigns = useCallback(() => {
-    if (publicCampaignId && publicCampaign) {
-      // If admin has selected a specific campaign for public display, show only that one
+    if (publicCampaignId > 0) {
+      // If admin has set a specific campaign for public display, show only that one
       const publicCampaignDetails = nearbyCampaigns.find(c => c.id === publicCampaignId);
-      return publicCampaignDetails ? [publicCampaignDetails] : nearbyCampaigns;
+      return publicCampaignDetails ? [publicCampaignDetails] : [];
     }
     // Otherwise, show all nearby campaigns
     return nearbyCampaigns;
-  }, [nearbyCampaigns, publicCampaignId, publicCampaign]);
+  }, [nearbyCampaigns, publicCampaignId]);
 
   // Get the campaigns to display
   const displayCampaigns = getDisplayCampaigns();
 
-  // Fetch nearby campaigns
+  // Fetch campaigns and public campaign ID
   const fetchCampaigns = useCallback(() => {
     if (!provider) return;
     
     dispatch(fetchNearbyCampaigns());
-  }, [dispatch, provider]);
+    fetchPublicCampaignId();
+  }, [dispatch, provider, fetchPublicCampaignId]);
 
   // Fetch detailed data for a specific campaign
   const fetchCampaignDetails = useCallback((campaignId: number) => {
@@ -87,6 +107,8 @@ export const useCampaignList = ({
     
     if (userAddress) {
       dispatch(checkUserRegistration({ campaignId, userAddress, provider }));
+      // Fetch user's vote for this campaign to persist voting state across page reloads
+      dispatch(fetchUserVote({ campaignId, userAddress, provider }));
     }
   }, [dispatch, userAddress, provider]);
 
@@ -148,10 +170,35 @@ export const useCampaignList = ({
       await voteForCandidate(campaignId, candidateAddress);
       return { success: true, message: 'Vote cast successfully!' };
     } catch (error) {
-      if(error instanceof Error){
-        return { success: false, message: error.message || 'Failed to cast vote' };
+      // Log full error details to console for debugging
+      console.error('Vote submission error:', error);
+      
+      // Provide user-friendly error messages
+      let userMessage = 'Failed to cast vote';
+      
+      if (error instanceof Error) {
+        const errorMsg = error.message.toLowerCase();
+        
+        if (errorMsg.includes('user rejected') || errorMsg.includes('user denied')) {
+          userMessage = 'Transaction cancelled by user';
+        } else if (errorMsg.includes('insufficient funds')) {
+          userMessage = 'Insufficient funds for transaction';
+        } else if (errorMsg.includes('already voted')) {
+          userMessage = 'You have already voted in this campaign';
+        } else if (errorMsg.includes('not authorized') || errorMsg.includes('not registered')) {
+          userMessage = 'You are not authorized to vote in this campaign';
+        } else if (errorMsg.includes('campaign ended') || errorMsg.includes('voting closed')) {
+          userMessage = 'Voting period has ended for this campaign';
+        } else if (errorMsg.includes('network')) {
+          userMessage = 'Network error - please check your connection';
+        } else if (errorMsg.includes('gas')) {
+          userMessage = 'Transaction failed due to gas issues';
+        } else {
+          userMessage = 'An unexpected error occurred';
+        }
       }
-      throw error;
+      
+      return { success: false, message: userMessage };
     }
   }, [voteForCandidate]);
 
@@ -204,51 +251,57 @@ export const useCampaignList = ({
     dispatch(resetVoteStatus());
   }, [dispatch]);
 
-  // Initial fetch
+  // Initial fetch - Debounced to prevent multiple rapid calls
   useEffect(() => {
-    fetchCampaigns();
+    const timeoutId = setTimeout(() => {
+      fetchCampaigns();
+    }, 100);
+    
+    return () => clearTimeout(timeoutId);
   }, [fetchCampaigns]);
 
-  // Refresh campaign participants when campaigns are loaded or user role changes
+  // Fetch detailed data for campaigns - Optimized to reduce calls
   useEffect(() => {
-    if (displayCampaigns.length > 0 && provider) {
+    if (!provider || displayCampaigns.length === 0) return;
+    
+    // Only fetch details for displayed campaigns, not all nearby campaigns
+    const timeoutId = setTimeout(() => {
       displayCampaigns.forEach(campaign => {
         fetchCampaignDetails(campaign.id);
       });
-    }
-  }, [displayCampaigns, provider, userRole, fetchCampaignDetails]);
-
-  // Fetch detailed data for all nearby campaigns - FIXED: Only run when provider is available
-  useEffect(() => {
-    if (!provider || nearbyCampaigns.length === 0) return;
+    }, 200);
     
-    nearbyCampaigns.forEach(campaign => {
-      fetchCampaignDetails(campaign.id);
-    });
-  }, [nearbyCampaigns, fetchCampaignDetails, provider]);
+    return () => clearTimeout(timeoutId);
+  }, [displayCampaigns, provider, fetchCampaignDetails]);
 
-  // Auto-refresh functionality
+  // Auto-refresh functionality - Reduced frequency
   useEffect(() => {
     if (!autoRefresh) return;
 
     const interval = setInterval(() => {
       fetchCampaigns();
-    }, refreshInterval);
+    }, Math.max(refreshInterval, 10000)); // Minimum 10 seconds
 
     return () => clearInterval(interval);
   }, [autoRefresh, refreshInterval, fetchCampaigns]);
 
-  // Filter campaigns by status
-  const activeCampaigns = nearbyCampaigns.filter(campaign => 
-    getCampaignStatus(campaign) === 'active'
+  // Filter campaigns by status - Memoized to prevent re-computation
+  const activeCampaigns = useMemo(() => 
+    nearbyCampaigns.filter(campaign => 
+      getCampaignStatus(campaign) === 'active'
+    ), [nearbyCampaigns, getCampaignStatus]
   );
   
-  const upcomingCampaigns = nearbyCampaigns.filter(campaign => 
-    getCampaignStatus(campaign) === 'upcoming'
+  const upcomingCampaigns = useMemo(() => 
+    nearbyCampaigns.filter(campaign => 
+      getCampaignStatus(campaign) === 'upcoming'
+    ), [nearbyCampaigns, getCampaignStatus]
   );
   
-  const endedCampaigns = nearbyCampaigns.filter(campaign => 
-    getCampaignStatus(campaign) === 'ended'
+  const endedCampaigns = useMemo(() => 
+    nearbyCampaigns.filter(campaign => 
+      getCampaignStatus(campaign) === 'ended'
+    ), [nearbyCampaigns, getCampaignStatus]
   );
 
   // Get user's voting status for a campaign with enhanced role-based logic
@@ -319,7 +372,6 @@ export const useCampaignList = ({
     userVotes,
     campaignParticipants,
     publicCampaignId,
-    publicCampaign,
     
     // Loading states
     loading: fetchingNearbyCampaigns,

@@ -31,7 +31,6 @@ export interface VotingCardProps {
     success: boolean;
     message: string;
   }>;
-  isVoting: boolean;
   campaignStatus?: string;
   allCandidates?: Array<{
     address: string;

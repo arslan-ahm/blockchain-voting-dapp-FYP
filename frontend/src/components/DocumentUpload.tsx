@@ -1,30 +1,29 @@
-import React, { useRef, useState } from "react";
-import { Upload, FileText, X } from "lucide-react";
+import { useState, useCallback, useRef } from "react";
+import { Upload, FileText, X, Loader2, CheckCircle } from "lucide-react";
 import { cn } from "../utils/cn";
-import type { DocumentUploadProps } from "../types/uploads";
 
-export const DocumentUpload: React.FC<DocumentUploadProps> = ({
-  onChange,
-  className,
-  accept = ".pdf,.doc,.docx,.jpg,.jpeg,.png"
-}) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+export interface DocumentUploadProps {
+  onChange: (file: File | undefined, ipfsHash?: string) => void;
+  onUpload?: (file: File) => Promise<string>;
+  className?: string;
+  accept?: string;
+  isUploading?: boolean;
+}
+
+export const DocumentUpload = ({ 
+  onChange, 
+  onUpload, 
+  className, 
+  accept = ".pdf,.doc,.docx",
+  isUploading = false 
+}: DocumentUploadProps) => {
   const [dragActive, setDragActive] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedHash, setUploadedHash] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (file: File | null) => {
-    setSelectedFile(file);
-    onChange(file || undefined);
-  };
-
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      handleFileChange(file);
-    }
-  };
-
-  const handleDrag = (e: React.DragEvent) => {
+  const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     if (e.type === "dragenter" || e.type === "dragover") {
@@ -32,92 +31,162 @@ export const DocumentUpload: React.FC<DocumentUploadProps> = ({
     } else if (e.type === "dragleave") {
       setDragActive(false);
     }
-  };
+  }, []);
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      const file = e.dataTransfer.files[0];
-      handleFileChange(file);
+  const uploadFile = async (file: File) => {
+    if (!onUpload) {
+      onChange(file);
+      return;
+    }
+
+    try {
+      setUploadError(null);
+      const ipfsHash = await onUpload(file);
+      setUploadedHash(ipfsHash);
+      onChange(file, ipfsHash);
+    } catch (error) {
+      console.error("Upload failed:", error);
+      setUploadError("Upload failed. Please try again.");
+      onChange(undefined);
     }
   };
 
-  const handleClick = () => {
-    fileInputRef.current?.click();
-  };
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file && (file.type === "application/pdf" || file.type.includes("document") || file.name.endsWith('.pdf') || file.name.endsWith('.doc') || file.name.endsWith('.docx'))) {
+        setSelectedFile(file);
+        setUploadedHash(null);
+        setUploadError(null);
+        uploadFile(file);
+      }
+    },
+    [onUpload, onChange]
+  );
 
-  const handleRemove = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    handleFileChange(null);
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) {
+        setSelectedFile(file);
+        setUploadedHash(null);
+        setUploadError(null);
+        uploadFile(file);
+      }
+    },
+    [onUpload, onChange]
+  );
+
+  const handleRemove = useCallback(() => {
+    setSelectedFile(null);
+    setUploadedHash(null);
+    setUploadError(null);
+    // Reset the file input value to allow selecting the same file again
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
+    onChange(undefined);
+  }, [onChange]);
+
+  const getStatusIcon = () => {
+    if (isUploading) {
+      return <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />;
+    }
+    if (uploadedHash) {
+      return <CheckCircle className="h-5 w-5 text-green-400" />;
+    }
+    if (uploadError) {
+      return <X className="h-5 w-5 text-red-400" />;
+    }
+    return <FileText className="h-5 w-5 text-green-400" />;
   };
 
-  const formatFileSize = (bytes: number) => {
-    if (bytes === 0) return "0 Bytes";
-    const k = 1024;
-    const sizes = ["Bytes", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+  const getStatusText = () => {
+    if (isUploading) {
+      return "Uploading...";
+    }
+    if (uploadedHash) {
+      return "Uploaded successfully";
+    }
+    if (uploadError) {
+      return uploadError;
+    }
+    return "Ready to upload";
+  };
+
+  const getStatusColor = () => {
+    if (isUploading) return "text-blue-400";
+    if (uploadedHash) return "text-green-400";
+    if (uploadError) return "text-red-400";
+    return "text-gray-400";
   };
 
   return (
-    <div className={cn("w-full", className)}>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept={accept}
-        onChange={handleFileSelect}
-        className="hidden"
-      />
-      
-      {selectedFile ? (
-        <div className="bg-gray-700 border-2 border-gray-600 border-dashed rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <FileText className="h-8 w-8 text-blue-400" />
-              <div>
-                <p className="text-gray-200 font-medium">{selectedFile.name}</p>
-                <p className="text-gray-400 text-sm">{formatFileSize(selectedFile.size)}</p>
-              </div>
-            </div>
-            <button
-              onClick={handleRemove}
-              className="text-gray-400 hover:text-red-400 transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+    <div className={cn("space-y-4", className)}>
+      <div
+        className={cn(
+          "relative flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg transition-colors cursor-pointer",
+          dragActive ? "border-blue-400 bg-blue-400/10" : "border-gray-600 bg-gray-700",
+          selectedFile && uploadedHash && "border-green-500 bg-green-500/10",
+          selectedFile && uploadError && "border-red-500 bg-red-500/10",
+          isUploading && "border-blue-500 bg-blue-500/10"
+        )}
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+      >
+        {selectedFile ? (
+          <div className="flex flex-col items-center">
+            {getStatusIcon()}
+            <p className="text-white text-sm font-medium mb-1 mt-2">{selectedFile.name}</p>
+            <p className="text-gray-400 text-xs mb-1">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+            <p className={cn("text-xs", getStatusColor())}>{getStatusText()}</p>
           </div>
-        </div>
-      ) : (
-        <div
-          onClick={handleClick}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
-          onDrop={handleDrop}
-          className={cn(
-            "border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors",
-            dragActive
-              ? "border-blue-400 bg-blue-400/10"
-              : "border-gray-600 hover:border-gray-500 hover:bg-gray-700/50",
-            className
-          )}
-        >
-          <Upload className="h-10 w-10 text-gray-400 mx-auto mb-4" />
-          <p className="text-gray-200 font-medium mb-2">
-            Upload Verification Document
-          </p>
-          <p className="text-gray-400 text-sm mb-4">
-            Drag and drop your document here, or click to browse
-          </p>
-          <p className="text-gray-500 text-xs">
-            Supported formats: PDF, DOC, DOCX, JPG, JPEG, PNG (Max 10MB)
-          </p>
+        ) : (
+          <>
+            <Upload className="h-12 w-12 text-gray-400 mb-4" />
+            <p className="text-gray-200 text-sm mb-2">Drag and drop a document, or click to select</p>
+            <p className="text-gray-400 text-xs">Supports PDF, DOC, DOCX files</p>
+          </>
+        )}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={accept}
+          onChange={handleChange}
+          className="absolute inset-0 opacity-0 cursor-pointer"
+          disabled={isUploading}
+        />
+      </div>
+      
+      {selectedFile && (
+        <div className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+          <div className="flex items-center gap-3">
+            {getStatusIcon()}
+            <div>
+              <p className="text-sm font-medium text-white">{selectedFile.name}</p>
+              <p className={cn("text-xs", getStatusColor())}>
+                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • {getStatusText()}
+              </p>
+              {uploadedHash && (
+                <p className="text-xs text-gray-500 truncate max-w-[200px]">
+                  IPFS: {uploadedHash}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={handleRemove}
+            className="p-1 hover:bg-gray-600 rounded transition-colors"
+            type="button"
+            disabled={isUploading}
+          >
+            <X className="h-4 w-4 text-gray-400" />
+          </button>
         </div>
       )}
     </div>

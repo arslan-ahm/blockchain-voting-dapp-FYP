@@ -356,10 +356,10 @@ const campaignSlice = createSlice({
           });
         }
       })
-      .addCase(castVote.rejected, (state, action) => {
+      .addCase(castVote.rejected, (state) => {
         state.voteStatus = "error";
         state.castingVote = false;
-        state.error = action.error.message || "Failed to cast vote";
+        // Don't set error state - errors are handled in component with toast
       })
       
       // Enhanced role-based voting
@@ -387,10 +387,10 @@ const campaignSlice = createSlice({
           });
         }
       })
-      .addCase(castVoteWithRoleCheck.rejected, (state, action) => {
+      .addCase(castVoteWithRoleCheck.rejected, (state) => {
         state.voteStatus = "error";
         state.castingVote = false;
-        state.error = action.error.message || "Failed to cast vote";
+        // Don't set error state - errors are handled in component with toast
       })
       
       .addCase(getUserVote.fulfilled, (state, action) => {
@@ -406,8 +406,9 @@ const campaignSlice = createSlice({
           state.userVotes.push(userVote);
         }
       })
-      .addCase(getUserVote.rejected, (state, action) => {
-        state.error = action.error.message || "Failed to fetch user vote";
+      .addCase(getUserVote.rejected, (_, action) => {
+        // Don't set error state - just log to console
+        console.error("Failed to fetch user vote:", action.error.message);
       })
       
       .addCase(manualCloseCampaign.pending, (state) => {

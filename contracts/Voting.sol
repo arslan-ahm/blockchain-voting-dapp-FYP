@@ -98,6 +98,9 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
     uint256 public nextCampaignId = 1;
     address public admin;
     uint256 public constant CAMPAIGN_REGISTRATION_WINDOW = 7 days;
+    
+    // Public campaign for display
+    uint256 public publicCampaignId = 0;
 
     event UserDetailsUpdated(address userAddress, string name, string email);
     event VerificationRequested(
@@ -130,11 +133,27 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
         uint256 campaignId,
         Role role
     );
+    event PublicCampaignSet(
+        uint256 campaignId,
+        address setBy
+    );
 
     constructor(address initialOwner) Ownable(initialOwner) {
-        admin = initialOwner;
-        userRoles[initialOwner] = Role.Admin;
-    }
+    admin = initialOwner;
+    userRoles[initialOwner] = Role.Admin;
+    
+    // Fix: Initialize the admin's user details to prevent issues
+    userDetails[initialOwner] = UserDetails(
+        "System Admin",
+        "",
+        0,
+        "",
+        "",
+        "System Administrator",
+        "",
+        new string[](0)
+    );
+}
 
     // Enhanced user functions
     function updateUserDetails(
@@ -926,30 +945,36 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
     }
 
     function hasActiveCampaign() public view returns (bool) {
-        for (uint256 i = 1; i < nextCampaignId; i++) {
-            if (
-                campaigns[i].campaignId != 0 &&
-                campaigns[i].isOpen &&
-                !campaigns[i].isDeleted
-            ) {
-                return true;
-            }
+    for (uint256 i = 1; i < nextCampaignId; i++) {
+        Campaign storage campaign = campaigns[i];
+        if (
+            campaign.campaignId != 0 &&
+            campaign.isOpen &&
+            !campaign.isDeleted &&
+            block.timestamp >= campaign.startDate &&
+            block.timestamp < campaign.endDate
+        ) {
+            return true;
         }
-        return false;
     }
+    return false;
+}
 
     function getActiveCampaignId() public view returns (uint256) {
-        for (uint256 i = 1; i < nextCampaignId; i++) {
-            if (
-                campaigns[i].campaignId != 0 &&
-                campaigns[i].isOpen &&
-                !campaigns[i].isDeleted
-            ) {
-                return i;
-            }
+    for (uint256 i = 1; i < nextCampaignId; i++) {
+        Campaign storage campaign = campaigns[i];
+        if (
+            campaign.campaignId != 0 &&
+            campaign.isOpen &&
+            !campaign.isDeleted &&
+            block.timestamp >= campaign.startDate &&
+            block.timestamp < campaign.endDate
+        ) {
+            return i;
         }
-        return 0;
     }
+    return 0;
+}
 
     function isUserRegisteredForCampaign(
         uint256 _campaignId,
@@ -964,6 +989,86 @@ contract Voting is Ownable, ReentrancyGuard, KeeperCompatibleInterface {
 
     function isUserDetailsLocked(address _user) public view returns (bool) {
         return userDetailsLocked[_user];
+    }
+
+    // Add these functions before the modifier onlyAdmin() at the end
+    
+    // Set public campaign for display
+    function switchToCampaign(uint256 _campaignId) public onlyAdmin {
+    require(_campaignId > 0, "Invalid campaign ID");
+    require(_campaignId < nextCampaignId, "Campaign ID out of range");
+    require(campaigns[_campaignId].campaignId != 0, "Campaign does not exist");
+    require(!campaigns[_campaignId].isDeleted, "Cannot set deleted campaign as public");
+    
+    publicCampaignId = _campaignId;
+    emit PublicCampaignSet(_campaignId, msg.sender);
+}
+    
+    // Get public campaign ID
+    function getPublicCampaignId() public view returns (uint256) {
+        return publicCampaignId;
+    }
+    
+    // Get public campaign details
+    function getPublicCampaign() public view returns (
+    uint256 campaignId,
+    uint256 startDate,
+    uint256 endDate,
+    address winner,
+    bool isOpen,
+    bool isDeleted,
+    string memory detailsIpfsHash,
+    string memory title,
+    string memory description,
+    uint256 totalVotes,
+    uint256 voterCount,
+    uint256 candidateCount,
+    CampaignStatus status
+) {
+    if (publicCampaignId == 0) {
+        // Return empty campaign if no public campaign is set
+        return (0, 0, 0, address(0), false, false, "", "", "", 0, 0, 0, CampaignStatus.Upcoming);
+    }
+    
+    // Fix: Add campaignId to the return values
+    (
+        startDate,
+        endDate,
+        winner,
+        isOpen,
+        isDeleted,
+        detailsIpfsHash,
+        title,
+        description,
+        totalVotes,
+        voterCount,
+        candidateCount,
+        status
+    ) = getCampaignDetails(publicCampaignId);
+    
+    campaignId = publicCampaignId;
+    
+    return (
+        campaignId,
+        startDate,
+        endDate,
+        winner,
+        isOpen,
+        isDeleted,
+        detailsIpfsHash,
+        title,
+        description,
+        totalVotes,
+        voterCount,
+        candidateCount,
+        status
+    );
+}
+    
+    // Clear public campaign (admin only)
+    function clearPublicCampaign() public onlyAdmin {
+        publicCampaignId = 0;
+        emit PublicCampaignSet(0, msg.sender);
     }
 
     modifier onlyAdmin() {

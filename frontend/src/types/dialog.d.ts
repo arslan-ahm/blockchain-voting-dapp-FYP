@@ -17,7 +17,8 @@ export interface AddCampaignDialogProps {
   form: UseFormReturn<CampaignFormData>;
   isCreating: boolean;
   isUploading: boolean;
-  onUpload: (content: string | File, startDate?: number, endDate?: number) => Promise<string>
+  onUpload: (content: string | File, startDate?: number, endDate?: number) => Promise<string>;
+  onImmediateUpload: (file: File) => Promise<string>; // Add this
 }
 
 // DeleteCampaignDialog

@@ -1,5 +1,11 @@
-import { useNavigate } from "react-router-dom";
-import { Loader2, Wallet, MoreVertical, Eye, X, Trash2, Newspaper } from "lucide-react";
+import {
+  Loader2,
+  Wallet,
+  MoreVertical,
+  Eye,
+  Trash2,
+  Newspaper,
+} from "lucide-react";
 import { useRef, useState } from "react";
 
 // Hooks
@@ -22,22 +28,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { ScrollArea } from "../../components/ui/scroll-area";
 import { FloatingMenu } from "../../components/FloatingMenu";
 import type { Campaign } from "../../types";
 import GradientText from "../../components/GradientText";
+import { cn } from "../../utils/cn";
+import {
+  getCampaignStatusBadgeColor,
+  mapCampaignStatus,
+} from "../../utils/helpers";
 
 const AdminDashboard = () => {
-  const navigate = useNavigate();
   const menuButtonRef = useRef<HTMLButtonElement>(null);
   const [showFloatingMenu, setShowFloatingMenu] = useState(false);
-  
+
   const {
     campaigns,
     selectedCampaign,
     publicCampaignId,
     autoSelectUrgent,
     adminLoading,
+    fetchingVerificationRequests, // Add this
     handleSelectCampaign,
     handleSetPublicCampaign,
     handleToggleAutoSelect,
@@ -54,18 +64,12 @@ const AdminDashboard = () => {
     handleDeleteCampaign,
     deletingCampaign,
     campaignToDelete,
-    handleCloseCampaign,
-    closingCampaign,
     adminDashboard,
     handleProcessVerification,
     processingVerification,
-    handleUploadDocument
+    handleUploadDocument,
+    handleImmediateDocumentUpload,
   } = useAdminDashboard();
-
-  // Handle navigation to campaign details
-  const handleViewCampaign = (campaignId: number) => {
-    navigate(`/campaigns/${campaignId}`);
-  };
 
   const { account } = useWallet();
 
@@ -90,29 +94,50 @@ const AdminDashboard = () => {
     );
   }
 
-  if (adminLoading && !campaigns.length) {
+  // Enhanced loading state - show loader when initially loading campaigns
+  if (adminLoading && campaigns.length === 0) {
     return (
       <div className="container mx-auto p-4 flex justify-center items-center h-[80vh]">
-        <Loader2 className="h-8 w-8 animate-spin" />
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-xl animate-pulse"></div>
+            <Loader2 className="relative h-12 w-12 animate-spin text-blue-400 mx-auto" />
+          </div>
+          <div className="space-y-2">
+            <GradientText
+              text="Loading Admin Dashboard"
+              className="text-lg font-medium"
+            />
+            <p className="text-sm text-gray-400">
+              Fetching campaigns and dashboard data...
+            </p>
+          </div>
+        </div>
       </div>
     );
   }
 
-  const currentCampaign = adminDashboard?.currentCampaign as unknown as Campaign;
+  const currentCampaign =
+    adminDashboard?.currentCampaign as unknown as Campaign;
 
+     console.log('=>', campaigns)
+     
   return (
-    <div className="container mx-auto p-4 space-y-6">
+    <div className="w-full min-h-screen bg-gray-900 py-12">
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-full sm:max-w-full md:max-w-6xl lg:max-w-7xl xl:max-w-7xl">
+        <div className="space-y-6">
       <AddCampaignDialog
-        isOpen={showCreateModal}
+        isOpen={!!showCreateModal}
         onClose={closeCreateModal}
         form={campaignForm}
         onSubmit={handleCreateCampaign}
         isCreating={creatingCampaign}
         isUploading={isUploading}
+        onImmediateUpload={handleImmediateDocumentUpload}
         onUpload={handleUploadDocument}
       />
       <DeleteCampaignDialog
-        isOpen={showDeleteModal}
+        isOpen={!!showDeleteModal}
         onClose={closeDeleteModal}
         onConfirm={() => handleDeleteCampaign(campaignToDelete!)}
         campaign={currentCampaign || null}
@@ -131,7 +156,7 @@ const AdminDashboard = () => {
               Welcome, {account.slice(0, 6) + "..." + account.slice(-4)}
             </p>
           </div>
-          
+
           {/* Desktop buttons */}
           <div className="hidden lg:flex items-center gap-3">
             <Button
@@ -148,44 +173,14 @@ const AdminDashboard = () => {
                 "Create Campaign"
               )}
             </Button>
-            
+
             {currentCampaign && (
               <>
-                <Button
-                  variant="outline"
-                  onClick={() => handleViewCampaign(currentCampaign.id || 0)}
-                  className="text-sm px-4 py-2 btn-blue"
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  View Details
-                </Button>
-                
-                {currentCampaign.status === "Upcoming" && (
-                  <Button
-                    variant="outline"
-                    onClick={() => handleCloseCampaign(currentCampaign.id || 0)}
-                    disabled={closingCampaign}
-                    className="border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 text-sm px-4 py-2"
-                  >
-                    {closingCampaign ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Closing...
-                      </>
-                    ) : (
-                      <>
-                        <X className="mr-2 h-4 w-4" />
-                        Close Campaign
-                      </>
-                    )}
-                  </Button>
-                )}
-                
                 <Button
                   variant="destructive"
                   onClick={() => openDeleteModal(currentCampaign.id || 0)}
                   disabled={deletingCampaign}
-                  className="text-sm px-4 py-2 btn-red"
+                  className="text-sm text-red-600 hover:bg-red-500/20 border border-red-600 px-4 py-2"
                 >
                   {deletingCampaign ? (
                     <>
@@ -202,7 +197,7 @@ const AdminDashboard = () => {
               </>
             )}
           </div>
-          
+
           {/* Mobile/Tablet buttons */}
           <div className="flex lg:hidden items-center gap-3">
             <Button
@@ -219,41 +214,22 @@ const AdminDashboard = () => {
                 "Create Campaign"
               )}
             </Button>
-            
+
             {currentCampaign && (
               <>
                 {/* Tablet view - show essential buttons */}
                 <div className="hidden md:flex lg:hidden items-center gap-2">
                   <Button
-                    variant="outline"
-                    onClick={() => handleViewCampaign(currentCampaign.id || 0)}
-                    size="sm"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </Button>
-                  
-                  <Button
                     variant="destructive"
                     onClick={() => openDeleteModal(currentCampaign.id || 0)}
                     disabled={deletingCampaign}
+                    className="text-red-600 border border-red-600 hover:bg-red-500/20"
                     size="sm"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
-                  
-                  {currentCampaign.status === "Upcoming" && (
-                    <Button
-                      variant="outline"
-                      onClick={() => handleCloseCampaign(currentCampaign.id || 0)}
-                      disabled={closingCampaign}
-                      className="border-amber-600 text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20"
-                      size="sm"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  )}
                 </div>
-                
+
                 {/* Mobile view - floating menu */}
                 <div className="md:hidden">
                   <Button
@@ -265,43 +241,19 @@ const AdminDashboard = () => {
                   >
                     <MoreVertical className="h-4 w-4" />
                   </Button>
-                  
+
                   <FloatingMenu
                     anchorRef={menuButtonRef}
                     isOpen={showFloatingMenu}
                     onClose={handleCloseFloatingMenu}
                   >
                     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-2 min-w-[180px]">
-                      <button
-                        onClick={() => handleActionClick(() => handleViewCampaign(currentCampaign.id || 0))}
-                        className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center"
-                      >
-                        <Eye className="mr-2 h-4 w-4" />
-                        View Details
-                      </button>
-                      
-                      {currentCampaign.status === "Upcoming" && (
-                        <button
-                          onClick={() => handleActionClick(() => handleCloseCampaign(currentCampaign.id || 0))}
-                          disabled={closingCampaign}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-amber-600 disabled:opacity-50"
-                        >
-                          {closingCampaign ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Closing...
-                            </>
-                          ) : (
-                            <>
-                              <X className="mr-2 h-4 w-4" />
-                              Close Campaign
-                            </>
-                          )}
-                        </button>
-                      )}
-                      
-                      <button
-                        onClick={() => handleActionClick(() => openDeleteModal(currentCampaign.id || 0))}
+                    <button
+                        onClick={() =>
+                          handleActionClick(() =>
+                            openDeleteModal(currentCampaign.id || 0)
+                          )
+                        }
                         disabled={deletingCampaign}
                         className="w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 flex items-center text-red-600 disabled:opacity-50"
                       >
@@ -326,7 +278,7 @@ const AdminDashboard = () => {
         </div>
       </div>
 
-      {campaigns.length > 0 ? (
+      {campaigns && campaigns.length > 0 ? (
         <div className="space-y-6">
           {/* Unified Campaign Manager Card */}
           <Card className="border border-gray-700 bg-gradient-to-br from-gray-900/50 to-gray-800/50 backdrop-blur-md shadow-xl hover:shadow-neon-blue transition-all duration-300">
@@ -339,198 +291,188 @@ const AdminDashboard = () => {
                       <Newspaper className="h-6 w-6 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-xl lg:text-2xl font-bold gradient-text">Campaign Manager</h3>
-                      <p className="text-sm text-gray-400 mt-1">Select campaigns to manage dashboard and public display</p>
+                      <h3 className="text-xl lg:text-2xl font-bold gradient-text">
+                        Campaign Manager
+                      </h3>
+                      <p className="text-sm text-gray-400 mt-1">
+                        Select campaigns to manage dashboard and public display
+                      </p>
                     </div>
                   </div>
-                  
+
                   {/* Campaign Count & Auto-select */}
                   <div className="flex items-center gap-4">
                     <div className="bg-gradient-to-r from-gray-700/50 to-gray-600/50 backdrop-blur-sm px-4 py-2 rounded-lg border border-gray-600/50">
-                      <div className="text-xs text-gray-400">Total Campaigns</div>
-                      <div className="text-lg font-bold text-white">{campaigns?.length || 0}</div>
-                    </div>
-                    
+                      <div className="text-xs text-gray-400">
+                        Total Campaigns
                       </div>
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="auto-select"
-                        checked={autoSelectUrgent}
-                        onChange={(e) => handleToggleAutoSelect(e.target.checked)}
-                        className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
-                      />
-                      <label htmlFor="auto-select" className="text-sm text-gray-300">
-                        Auto-select urgent
-                      </label>
+                      <div className="text-lg font-bold text-white">
+                        {campaigns?.length || 0}
+                      </div>
                     </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="auto-select"
+                      checked={autoSelectUrgent}
+                      onChange={(e) => handleToggleAutoSelect(e.target.checked)}
+                      className="rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500"
+                    />
+                    <label
+                      htmlFor="auto-select"
+                      className="text-sm text-gray-300"
+                    >
+                      Auto
+                    </label>
+                  </div>
                 </div>
 
                 {/* Campaign Selection */}
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>
-                    <label className="text-sm font-medium text-gray-300">Select Campaign</label>
+                    <label className="text-sm font-medium text-gray-300">
+                      Select Campaign
+                      {adminLoading && (
+                        <span className="ml-2 text-xs text-blue-400">
+                          (loading...)
+                        </span>
+                      )}
+                    </label>
                   </div>
-                  
+
                   <Select
                     value={selectedCampaign?.toString() || ""}
-                    onValueChange={(value) => handleSelectCampaign(Number(value))}
+                    onValueChange={(value) =>
+                      handleSelectCampaign(Number(value))
+                    }
+                    disabled={adminLoading}
                   >
-                    <SelectTrigger className="w-full h-16 border-2 border-gray-600 bg-gray-800/80 hover:border-blue-500 focus:border-blue-500 transition-all duration-300 backdrop-blur-sm shadow-lg">
-                      <div className="flex items-center gap-4 px-2">
-                        <div className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-400 to-purple-400 animate-pulse flex-shrink-0"></div>
-                        <SelectValue 
-                          placeholder="🎯 Choose a campaign to manage dashboard and analytics" 
-                          className="text-gray-300"
-                        />
-                      </div>
+                    <SelectTrigger className="w-full h-12 border border-gray-700 hover:border-gray-400 focus:border-blue-500 transition-colors text-gray-300">
+                      <SelectValue 
+                        placeholder={adminLoading ? "Loading campaigns..." : "Choose a campaign"} 
+                      />
                     </SelectTrigger>
-                    <SelectContent className="border-gray-600 bg-gray-800/95 backdrop-blur-md shadow-2xl min-w-[600px] max-w-[800px] p-2">
-                      <ScrollArea className="h-96">
-                        {campaigns?.length > 0 ? (
-                          <div className="space-y-2">
-                            {campaigns?.map((campaign) => {
-                              const isCurrentlyPublic = publicCampaignId === campaign?.id;
-                              const isSelected = selectedCampaign === campaign?.id;
-                              
-                              // Enhanced status determination
-                              let statusConfig = {
-                                text: "Unknown",
-                                color: "bg-gray-500/20 text-gray-300 border-gray-500/50",
-                                icon: "🔍",
-                                bgColor: "from-gray-500/10 to-gray-600/10"
-                              };
-                              
-                              switch (campaign?.status) {
-                                case 0:
-                                  statusConfig = {
-                                    text: "Upcoming",
-                                    color: "bg-blue-500/20 text-blue-300 border-blue-500/50",
-                                    icon: "⏳",
-                                    bgColor: "from-blue-500/10 to-blue-600/10"
-                                  };
-                                  break;
-                                case 1:
-                                  statusConfig = {
-                                    text: "Active",
-                                    color: "bg-green-500/20 text-green-300 border-green-500/50",
-                                    icon: "🟢",
-                                    bgColor: "from-green-500/10 to-green-600/10"
-                                  };
-                                  break;
-                                case 2:
-                                  statusConfig = {
-                                    text: "Completed",
-                                    color: "bg-yellow-500/20 text-yellow-300 border-yellow-500/50",
-                                    icon: "✅",
-                                    bgColor: "from-yellow-500/10 to-yellow-600/10"
-                                  };
-                                  break;
-                                case 3:
-                                  statusConfig = {
-                                    text: "Deleted",
-                                    color: "bg-red-500/20 text-red-300 border-red-500/50",
-                                    icon: "🗑️",
-                                    bgColor: "from-red-500/10 to-red-600/10"
-                                  };
-                                  break;
-                              }
-                              
-                              return (
-                                <SelectItem
-                                  key={campaign?.id}
-                                  value={campaign?.id.toString()}
-                                  className="cursor-pointer w-full flex items-center p-0 transition-all duration-200 focus:bg-transparent hover:bg-transparent border-0 data-[state=checked]:bg-transparent"
-                                >
-                                  <div className={`w-full bg-gradient-to-r ${statusConfig.bgColor} rounded-xl p-5 border transition-all duration-200 hover:shadow-lg m-1 relative flex flex-row-reverse justify-between items-center ${
-                                    isSelected 
-                                      ? 'border-blue-500/70 ring-2 ring-blue-500/30 shadow-md shadow-blue-500/20' 
-                                      : 'border-gray-600/30 hover:border-gray-500/50'
-                                  }`}>
-                                    {/* Live Badge */}
-                                    {isCurrentlyPublic && (
-                                      <div className="px-2 py-1 text-xs rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/50 font-medium flex items-center gap-1">
-                                        <div className="w-2 h-2 rounded-full bg-purple-400 animate-pulse"></div>
-                                        LIVE
-                                      </div>
-                                    )}
 
-                                    <div className="flex items-center gap-5 w-full">
-                                      {/* Campaign Icon */}
-                                      <div className="flex-shrink-0">
-                                        <div className="w-6 h-6 rounded-md bg-gray-700/50 flex items-start justify-center ring-2 ring-gray-600/30">
-                                          <span className="w-4 h-4">{statusConfig.icon}</span>
-                                        </div>
-                                      </div>
-                                      
-                                      {/* Campaign Info */}
-                                      <div className="flex-1 flex items-center justify-between w-full min-w-0">
-                                        <div className="flex items-center justify-between gap-4 mb-3">
-                                          <h4 className="font-bold text-gray-200 text-lg truncate">
-                                            {campaign?.title || `Campaign ${campaign?.id}`}
-                                          </h4>
-                                          <span className={`flex-shrink-0 px-3 py-1.5 text-xs rounded-lg border ${statusConfig.color} font-medium`}>
-                                            {statusConfig.text}
-                                          </span>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-4 flex-wrap">
-                                          <span className="inline-flex items-center bg-gray-700/70 text-gray-300 px-3 py-1.5 rounded-lg text-xs font-mono">
-                                            <span className="text-gray-400 mr-2">#</span>
-                                            {campaign?.id}
-                                          </span>
-                                          
-                                          {campaign?.startDate && (
-                                            <span className="inline-flex items-center bg-gray-700/70 text-gray-300 px-3 py-1.5 rounded-lg text-xs">
-                                              <span className="mr-2">📅</span>
-                                              {new Date(campaign.startDate * 1000).toLocaleDateString('en-US', { 
-                                                month: 'short', 
-                                                day: 'numeric',
-                                                year: 'numeric'
-                                              })}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </SelectItem>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <div className="p-8 text-center">
-                            <div className="inline-flex items-center justify-center w-16 h-16 bg-gray-700/50 rounded-full mb-4">
-                              <div className="text-3xl">📋</div>
-                            </div>
-                            <p className="text-gray-300 font-medium mb-1">No campaigns available</p>
-                            <p className="text-xs text-gray-500">Create your first campaign to get started</p>
-                          </div>
-                        )}
-                      </ScrollArea>
+                    <SelectContent className="border border-gray-700 bg-gradient-to-br from-gray-900/50 to-gray-800/50 backdrop-blur-md shadow-lg max-h-80 overflow-auto text-gray-300 bg-gray-900">
+                      {campaigns && campaigns?.length > 0 ? (
+                        campaigns.map((campaign) => {
+                          const isCurrentlyPublic =
+                            publicCampaignId === campaign?.id;
+
+                          // Simple status text
+                          let statusText = "Unknown";
+                          switch (campaign?.status) {
+                            case 0:
+                              statusText = "Upcoming";
+                              break;
+                            case 1:
+                              statusText = "Active";
+                              break;
+                            case 2:
+                              statusText = "Completed";
+                              break;
+                            case 3:
+                              statusText = "Deleted";
+                              break;
+                          }
+
+                          return (
+                            // Update the Select component section (around line 350)
+                            <SelectItem
+                              key={campaign?.id}
+                              value={campaign?.id.toString()}
+                              className={cn(
+                                "cursor-pointer py-3 px-4",
+                                isCurrentlyPublic && "bg-primary/10 border-l-4 border-l-primary"
+                              )}
+                            >
+                              <div className="flex items-center justify-between gap-1 w-full min-w-0">
+                                <div className="flex items-center gap-3 min-w-0 flex-1">
+                                  <span className="font-medium truncate">
+                                    <span className="text-sm text-gray-500 flex-shrink-0">
+                                      #{campaign?.id}
+                                    </span>
+                                  </span>
+                                </div>
+                            
+                                <div className="flex items-center pl-1 truncate flex-1">
+                                  {campaign?.title}
+                                </div>
+
+                                <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                                  {isCurrentlyPublic && (
+                                    <span className="text-xs bg-primary px-2 py-1 rounded">
+                                      LIVE
+                                    </span>
+                                  )}
+                                  <span
+                                    className={cn(
+                                      `text-xs px-2 py-1 rounded whitespace-nowrap`,
+                                      getCampaignStatusBadgeColor(
+                                        mapCampaignStatus(statusText.toLocaleLowerCase())
+                                      )
+                                    )}
+                                  >
+                                    {statusText}
+                                  </span>
+                                  {campaign?.startDate && (
+                                    <span className="text-xs text-gray-500 hidden lg:inline whitespace-nowrap">
+                                      {new Date(
+                                        campaign.startDate * 1000
+                                      ).toLocaleString("en-US", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit"
+                                      })}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </SelectItem>
+                          );
+                        })
+                      ) : (
+                        <div className="p-6 text-center text-gray-500">
+                          <p className="font-medium">No campaigns available</p>
+                          <p className="text-sm mt-1">
+                            Create your first campaign to get started
+                          </p>
+                        </div>
+                      )}
                     </SelectContent>
                   </Select>
 
                   {/* Set Public Campaign Button */}
-                  {selectedCampaign && publicCampaignId !== selectedCampaign && (
-                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
-                      <div className="flex items-center gap-3">
-                        <Eye className="h-5 w-5 text-purple-400" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-200">Make this campaign public</p>
-                          <p className="text-xs text-gray-400">This will display the selected campaign on the public campaign page</p>
+                  {selectedCampaign &&
+                    publicCampaignId !== selectedCampaign && (
+                      <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          <Eye className="h-5 w-5 text-purple-400" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-200">
+                              Make this campaign public
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              This will display the selected campaign on the
+                              public campaign page
+                            </p>
+                          </div>
                         </div>
+                        <Button
+                          onClick={() =>
+                            handleSetPublicCampaign(selectedCampaign)
+                          }
+                          size="sm"
+                          className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-purple-500/25"
+                        >
+                          Set as Public
+                        </Button>
                       </div>
-                      <Button
-                        onClick={() => handleSetPublicCampaign(selectedCampaign)}
-                        size="sm"
-                        className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 transition-all duration-200 hover:scale-105 shadow-lg hover:shadow-purple-500/25"
-                      >
-                        Set as Public
-                      </Button>
-                    </div>
-                  )}
+                    )}
                 </div>
               </div>
             </CardContent>
@@ -538,20 +480,46 @@ const AdminDashboard = () => {
 
           {adminDashboard?.currentCampaign ? (
             <div className="space-y-6">
-              <CampaignStats
-                campaign={currentCampaign}
-              />
+              {/* Show loading overlay when refreshing campaign data */}
+              {adminLoading && (
+                <div className="bg-gradient-to-r from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl p-4">
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="h-5 w-5 animate-spin text-blue-400" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-200">
+                        Refreshing Campaign Data
+                      </p>
+                      <p className="text-xs text-gray-400">
+                        Please wait while we update the latest information...
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <CampaignStats campaign={currentCampaign} />
 
               <CampaignCharts
                 campaign={currentCampaign}
                 adminDashboard={adminDashboard}
               />
 
-              <VerificationRequests
-                requests={adminDashboard.verificationRequests}
-                onProcessVerification={handleProcessVerification}
-                isProcessing={processingVerification}
-              />
+              {/* Verification Requests with loading state */}
+              <div className="relative">
+                {fetchingVerificationRequests && (
+                  <div className="absolute top-4 right-4 z-10">
+                    <div className="bg-blue-500/20 backdrop-blur-sm rounded-lg px-3 py-2 flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin text-blue-400" />
+                      <span className="text-xs text-blue-400">Loading requests...</span>
+                    </div>
+                  </div>
+                )}
+                <VerificationRequests
+                  requests={adminDashboard.verificationRequests}
+                  onProcessVerification={handleProcessVerification}
+                  isProcessing={processingVerification}
+                />
+              </div>
             </div>
           ) : (
             <div className="flex justify-center items-center min-h-[40vh]">
@@ -562,8 +530,12 @@ const AdminDashboard = () => {
                     <Loader2 className="relative h-12 w-12 animate-spin text-blue-400 mx-auto" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-lg font-medium gradient-text">Loading Campaign Data</p>
-                    <p className="text-sm text-gray-400">Please wait while we fetch the campaign details...</p>
+                    <p className="text-lg font-medium gradient-text">
+                      Loading Campaign Data
+                    </p>
+                    <p className="text-sm text-gray-400">
+                      Please wait while we fetch the campaign details...
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -577,7 +549,9 @@ const AdminDashboard = () => {
                         className="text-xl font-semibold mb-2"
                       />
                       <p className="text-gray-400 max-w-sm mx-auto">
-                        Select a campaign from the dropdown above to view detailed analytics, manage participants, and process verification requests.
+                        Select a campaign from the dropdown above to view
+                        detailed analytics, manage participants, and process
+                        verification requests.
                       </p>
                     </div>
                   </div>
@@ -599,7 +573,9 @@ const AdminDashboard = () => {
                   className="text-2xl font-bold mb-2"
                 />
                 <p className="text-gray-400 mb-6 max-w-md mx-auto">
-                  Welcome to your admin dashboard! Start by creating your first campaign to manage voting processes and engage with your community.
+                  Welcome to your admin dashboard! Start by creating your first
+                  campaign to manage voting processes and engage with your
+                  community.
                 </p>
                 <Button
                   onClick={openCreateModal}
@@ -623,6 +599,8 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+        </div>
+      </div>
     </div>
   );
 };

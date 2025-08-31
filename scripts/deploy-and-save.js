@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { ignition } = require("hardhat");
+const VotingModule = require("../ignition/modules/Voting.js");
 
 async function main() {
   const network = hre.network.name;
@@ -14,7 +15,7 @@ async function main() {
   console.log("Deploying Voting contract...");
   
   try {
-    const { voting } = await ignition.deploy("VotingModule");
+    const { voting } = await ignition.deploy(VotingModule);
     
     const contractAddress = await voting.getAddress();
     console.log("Voting contract deployed to:", contractAddress);

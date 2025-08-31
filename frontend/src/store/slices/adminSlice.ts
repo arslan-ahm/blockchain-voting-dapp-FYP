@@ -17,6 +17,7 @@ import {
   fetchVerificationRequests,
   setPublicCampaignForDisplay,
   checkAndAutoSelectUrgentCampaign,
+  fetchPublicCampaign,
 } from "../thunks/adminThunks";
 import { getStatusAsNumber, mapCampaignStatus } from "../../utils/helpers";
 
@@ -481,11 +482,17 @@ export const adminSlice = createSlice({
         state.publicCampaignId = action.payload;
       })
 
-      // Auto-select urgent campaign
+      // Auto-select urgent campaign - only affects publicCampaignId, not selectedCampaignId
       .addCase(checkAndAutoSelectUrgentCampaign.fulfilled, (state, action) => {
         if (action.payload !== null) {
+          // Only update the public campaign, don't touch selectedCampaignId
           state.publicCampaignId = action.payload;
         }
+      })
+      
+      // Fetch public campaign
+      .addCase(fetchPublicCampaign.fulfilled, (state, action) => {
+        state.publicCampaignId = action.payload;
       });
   },
 });

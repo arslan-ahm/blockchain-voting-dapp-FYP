@@ -1,6 +1,6 @@
 // Auto-generated contract constants
 // Network: localhost
-// Deployed at: 2025-07-16T03:46:31.194Z
+// Deployed at: 2025-08-05T04:18:09.167Z
 // Contract Address: 0x5FbDB2315678afecb367f032d93F642f64180aa3
 
 export const VOTING_CONTRACT_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
@@ -135,6 +135,25 @@ export const VOTING_CONTRACT_ABI = [
       }
     ],
     "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "setBy",
+        "type": "address"
+      }
+    ],
+    "name": "PublicCampaignSet",
     "type": "event"
   },
   {
@@ -415,6 +434,13 @@ export const VOTING_CONTRACT_ABI = [
   {
     "inputs": [],
     "name": "cleanupPendingRequests",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "clearPublicCampaign",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -819,6 +845,92 @@ export const VOTING_CONTRACT_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "getPublicCampaign",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "campaignId",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "startDate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "endDate",
+        "type": "uint256"
+      },
+      {
+        "internalType": "address",
+        "name": "winner",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "isOpen",
+        "type": "bool"
+      },
+      {
+        "internalType": "bool",
+        "name": "isDeleted",
+        "type": "bool"
+      },
+      {
+        "internalType": "string",
+        "name": "detailsIpfsHash",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "title",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "description",
+        "type": "string"
+      },
+      {
+        "internalType": "uint256",
+        "name": "totalVotes",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "voterCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "candidateCount",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum CampaignStatus",
+        "name": "status",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "getPublicCampaignId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -1094,6 +1206,19 @@ export const VOTING_CONTRACT_ABI = [
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "publicCampaignId",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -1127,6 +1252,19 @@ export const VOTING_CONTRACT_ABI = [
       }
     ],
     "name": "requestVerification",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "_campaignId",
+        "type": "uint256"
+      }
+    ],
+    "name": "switchToCampaign",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

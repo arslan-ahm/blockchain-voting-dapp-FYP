@@ -330,11 +330,11 @@ export const fetchNearbyCampaigns = createAsyncThunk(
 
 export const registerForCampaign = createAsyncThunk(
   "user/registerForCampaign",
-  async ({campaignId, provider}: {campaignId: number, provider: ethers.Provider}, { rejectWithValue }) => {
+  async ({campaignId, signer}: {campaignId: number, signer: ethers.Signer}, { rejectWithValue }) => {
     try {
-      if (!provider) throw new Error("Provider not connected");
+      if (!signer) throw new Error("Signer not connected");
 
-      const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, provider);
+      const contract = new ethers.Contract(VOTING_CONTRACT_ADDRESS, VOTING_CONTRACT_ABI, signer);
 
       const tx = await contract.registerForCampaign(campaignId);
       await tx.wait();

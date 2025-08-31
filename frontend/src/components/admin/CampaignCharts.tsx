@@ -64,8 +64,8 @@ export const CampaignCharts = ({ campaign, adminDashboard }: CampaignChartsProps
   const campaignStatus = campaign?.status || 'Unknown';
 
   const participantData = [
-    { name: "Candidates", count: participantStats?.candidateCount || 0 },
-    { name: "Voters", count: participantStats?.voterCount || 0 }
+    { name: "Candidates", count: participantStats?.candidateCount || 0, fill: "#629fff" }, // Blue for candidates
+    { name: "Voters", count: participantStats?.voterCount || 0, fill: "#8B5CF6" } // Purple for voters
   ];
 
   const totalVoters = voteStats?.totalVoters || 0;
@@ -147,10 +147,13 @@ export const CampaignCharts = ({ campaign, adminDashboard }: CampaignChartsProps
               />
               <Bar 
                 dataKey="count" 
-                fill="#3B82F6" 
                 maxBarSize={60}
                 radius={[4, 4, 0, 0]}
-              />
+              >
+                {participantData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.fill} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </CardContent>

@@ -8,13 +8,13 @@ import { Card } from "./ui/card";
 import { useAppSelector } from "../hooks/useRedux";
 import { Role } from "../types";
 import type { VotingCardProps } from "../types/VotingCard";
+import { toast } from "sonner";
 
 const VotingCard: React.FC<VotingCardProps> = ({
   candidate,
   campaignId,
   userVotingStatus,
   onVote,
-  isVoting,
   campaignStatus = "active",
   allCandidates = [],
 }) => {
@@ -50,10 +50,25 @@ const VotingCard: React.FC<VotingCardProps> = ({
     try {
       const result = await onVote(campaignId, candidate.address);
       if (result.success) {
+        toast.success(result.message, {
+          description: `Your vote for ${candidate.name} has been recorded`,
+          duration: 4000,
+        });
         console.log("Vote successful:", result.message);
       } else {
+        toast.error(result.message, {
+          description: "Please try again or contact support if the issue persists",
+          duration: 5000,
+        });
         console.error("Vote failed:", result.message);
       }
+    } catch (error) {
+      // This should rarely happen since we handle errors in the vote function
+      console.error("Unexpected voting error:", error);
+      toast.error("An unexpected error occurred", {
+        description: "Please try again later",
+        duration: 5000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -63,7 +78,7 @@ const VotingCard: React.FC<VotingCardProps> = ({
 
   return (
     <Card
-      className={`group transition-all duration-300 hover:shadow-2xl transform-gpu min-h-[400px] ${
+      className={`group transition-all duration-300 hover:shadow-2xl transform-gpu min-h-[400px] w-full ${
         shouldShowLeaderStyles
           ? "bg-gradient-to-br from-yellow-900/40 to-orange-900/40 border-yellow-400/60 ring-2 ring-yellow-400/30 shadow-yellow-500/20"
           : "bg-gradient-to-br from-gray-800 to-gray-900 border-gray-600"
@@ -193,14 +208,14 @@ const VotingCard: React.FC<VotingCardProps> = ({
               {userVotingStatus.canVote && !isVotedFor && (
                 <Button
                   onClick={handleVote}
-                  disabled={isSubmitting || isVoting}
+                  disabled={isSubmitting}
                   className={`w-full py-3 text-white font-semibold transition-all duration-200 hover:shadow-lg hover:scale-105 transform-gpu ${
                     shouldShowLeaderStyles
                       ? "bg-gradient-to-r from-yellow-500 to-orange-600 hover:from-yellow-600 hover:to-orange-700"
                       : "bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
                   }`}
                 >
-                  {isSubmitting || isVoting ? (
+                  {isSubmitting ? (
                     <div className="flex items-center justify-center gap-2">
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                       Casting Vote...
@@ -226,7 +241,7 @@ const VotingCard: React.FC<VotingCardProps> = ({
               {userVotingStatus.hasVoted && !isVotedFor && (
                 <div className="text-center py-4 bg-gray-700/50 rounded-lg border border-gray-600">
                   <span className="text-sm text-gray-400 font-medium">
-                    You have already voted in this campaign
+                    You have already voted 
                   </span>
                 </div>
               )}

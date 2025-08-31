@@ -66,7 +66,6 @@ export const useWallet = () => {
     setSigner(null);
     setIsLoggedOut(true);
     dispatch(clearUser());
-    toast.info('Wallet disconnected');
   }, [dispatch]);
 
   useEffect(() => {

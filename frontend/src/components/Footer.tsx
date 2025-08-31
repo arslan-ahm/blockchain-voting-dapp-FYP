@@ -23,7 +23,7 @@ const Footer:React.FC = () => {
                   <Vote className="w-4 h-4 text-white" />
                 </div>
                 <span className="text-xl font-bold text-white">
-                  Block<span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Vote</span>
+                  Vote<span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Ledger</span>
                 </span>
               </div>
               <p className="text-gray-400 mt-2">Secure blockchain voting for everyone</p>
@@ -66,7 +66,7 @@ const Footer:React.FC = () => {
           </div>
           
           <div className="border-t border-gray-800 mt-12 pt-8 text-center">
-            <p className="text-gray-500">© {new Date().getFullYear()} BlockVote. All rights reserved.</p>
+            <p className="text-gray-500">© {new Date().getFullYear()} VoteLedger. All rights reserved.</p>
           </div>
         </div>
       </footer>

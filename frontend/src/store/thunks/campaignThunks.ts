@@ -765,7 +765,7 @@ export const castVote = createAsyncThunk(
     try {
       const tx = await contract.vote(campaignId, candidate);
       const receipt = await tx.wait();
-      toast.success("Vote cast successfully");
+      console.log("Vote cast successfully");
 
       return {
         transactionHash: receipt.transactionHash,
@@ -773,7 +773,7 @@ export const castVote = createAsyncThunk(
         candidate,
       };
     } catch (error) {
-      toast.error("Failed to cast vote");
+      console.error("Failed to cast vote:", error);
       throw error;
     }
   }
@@ -1060,7 +1060,7 @@ export const castVoteWithRoleCheck = createAsyncThunk(
         try {
           const registerTx = await contract.registerForCampaign(campaignId);
           await registerTx.wait();
-          toast.success("Successfully registered for voting!");
+          console.log("Successfully registered for voting!");
         } catch (registrationError) {
           console.warn("Auto-registration failed, attempting direct vote:", registrationError);
           // Continue with voting attempt - the contract will handle the registration internally
@@ -1090,7 +1090,7 @@ export const castVoteWithRoleCheck = createAsyncThunk(
       const tx = await contract.vote(campaignId, candidate);
       const receipt = await tx.wait();
       
-      toast.success("Vote cast successfully!");
+      console.log("Vote cast successfully!");
 
       return {
         transactionHash: receipt.transactionHash,
@@ -1101,23 +1101,15 @@ export const castVoteWithRoleCheck = createAsyncThunk(
     } catch (error) {
       console.error("Failed to cast vote with role check:", error);
       
-      // Enhanced error handling
+      // Enhanced error handling - removed toasts as they're handled in the component
       if (error instanceof Error) {
-        if (error.message.includes("Not a voter")) {
-          toast.error("You need to have a verified voter role to vote. Please request verification from admin.");
-        } else if (error.message.includes("Already voted")) {
-          toast.error("You have already voted in this campaign");
-        } else if (error.message.includes("Campaign not started")) {
-          toast.error("Campaign has not started yet");
-        } else if (error.message.includes("Campaign ended")) {
-          toast.error("Campaign has ended");
-        } else if (error.message.includes("Invalid candidate")) {
-          toast.error("Invalid candidate selected");
-        } else if (error.message.includes("Not registered")) {
-          toast.error("Registration for this campaign failed. Please try again.");
-        } else {
-          toast.error(error.message || "Failed to cast vote");
-        }
+        console.error("Vote error details:", {
+          message: error.message,
+          type: error.name,
+          campaignId,
+          candidate,
+          userAddress
+        });
       }
       
       throw error;

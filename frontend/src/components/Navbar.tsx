@@ -35,10 +35,9 @@ export const Navbar = () => {
   const [isScrolled, setIsScrolled] = useState(false);
   const user = useAppSelector((state) => state.user);
   const dispatch = useAppDispatch();
-  const { disconnect, account } = useWallet();
+  const { disconnect, account, provider } = useWallet();
   const navigate = useNavigate();
   const location = useLocation();
-  const { provider } = useWallet();
 
   // Determine if user is authenticated and get their role
   const isAuthenticated = !!user.account;
@@ -114,12 +113,11 @@ export const Navbar = () => {
 
   const handleLogout = async () => {
     try {
-      console.log("Logging out...", user.account);
       dispatch(clearUser());
       await disconnect();
       closeMenu();
+      toast.info('Wallet disconnected');
       navigate("/");
-      toast.info("Wallet disconnected");
     } catch (error) {
       console.error("Logout error:", error);
       toast.error("Error during logout");
@@ -140,9 +138,9 @@ export const Navbar = () => {
             <Vote className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl md:text-2xl font-bold text-white">
-            Block
+            Vote
             <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Vote
+              Ledger
             </span>
           </span>
         </Link>

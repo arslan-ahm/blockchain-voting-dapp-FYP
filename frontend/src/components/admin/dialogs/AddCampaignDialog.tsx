@@ -8,7 +8,7 @@ import {
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
-import { AlertCircle, FileText, Edit } from "lucide-react";
+import { AlertCircle, FileText, Upload } from "lucide-react";
 import {
   Tabs,
   TabsContent,
@@ -17,8 +17,9 @@ import {
 } from "../../ui/tabs";
 import type { AddCampaignDialogProps } from "../../../types/dialog";
 import { CustomDatePicker } from "../../CustomDatePicker";
-import RichTextEditor from "../../RichTextEditor";
+import { DocumentUpload } from "../../DocumentUpload";
 
+// Update the props interface to include the new upload handler
 export const AddCampaignDialog = ({
   isOpen,
   onClose,
@@ -26,37 +27,34 @@ export const AddCampaignDialog = ({
   form,
   isCreating,
   isUploading,
-  onUpload,
+  // onUpload,
+  onImmediateUpload, // Add this new prop
 }: AddCampaignDialogProps) => {
   const [dateError, setDateError] = useState<string>("");
-  const [campaignRules, setCampaignRules] = useState<string>("");
   const [activeTab, setActiveTab] = useState("details");
+  const [selectedDocument, setSelectedDocument] = useState<File | undefined>(undefined);
+  const [documentHash, setDocumentHash] = useState<string | undefined>(undefined);
 
   const handleSubmit = form.handleSubmit((data) => {
-    // Include the rich text content in the form data
     const formData = {
       ...data,
-      campaignDetails: campaignRules,
+      campaignDocument: selectedDocument,
+      documentHash: documentHash, // Include the pre-uploaded hash
     };
     return onSubmit(formData);
   });
 
-  const handleRichTextUpload = async (content: string | File) => {
-    if (typeof content === 'string') {
-      // Handle rich text content upload
-      return await onUpload(content, form.getValues("startDate"), form.getValues("endDate"));
-    } else {
-      // Handle file upload
-      return await onUpload(content);
-    }
+  const handleDocumentUpload = (file: File | undefined, ipfsHash?: string) => {
+    setSelectedDocument(file);
+    setDocumentHash(ipfsHash);
   };
 
-  // Calculate minimum dates
+  // Calculate minimum dates - allow current time plus 10 minutes
   const now = new Date();
-  const minStartDate = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes from now
-  const minEndDate = form.watch("startDate")
-    ? new Date(form.watch("startDate") * 1000 + 24 * 60 * 60 * 1000) // 24 hours after start date
-    : new Date(now.getTime() + 24 * 60 * 60 * 1000); // 24 hours from now
+  const minStartDateTime = new Date(now.getTime() + 10 * 60 * 1000); // 10 minutes from now
+  const minEndDateTime = form.watch("startDate")
+    ? new Date(form.watch("startDate") * 1000 + 60 * 60 * 1000) // 1 hour after start date
+    : new Date(now.getTime() + 60 * 60 * 1000); // 1 hour from now
 
   // Validate dates when they change
   useEffect(() => {
@@ -72,14 +70,14 @@ export const AddCampaignDialog = ({
         const now = new Date();
 
         if (startDateTime <= now) {
-          setDateError("Start date must be in the future");
+          setDateError("Start time must be at least 10 minutes from now");
         } else if (endDateTime <= startDateTime) {
-          setDateError("End date must be after start date");
+          setDateError("End time must be after start time");
         } else if (
           endDateTime.getTime() - startDateTime.getTime() <
-          24 * 60 * 60 * 1000
+          60 * 60 * 1000
         ) {
-          setDateError("Campaign must run for at least 24 hours");
+          setDateError("Campaign must run for at least 1 hour");
         } else {
           setDateError("");
         }
@@ -92,27 +90,27 @@ export const AddCampaignDialog = ({
   const isFormValid = () => {
     const hasBasicFields = form.watch("title") && form.watch("description");
     const hasValidDates = !dateError && form.watch("startDate") && form.watch("endDate");
-    const hasContract = campaignRules.trim();
-    
-    return hasBasicFields && hasValidDates && hasContract;
+    // Removed rich text requirement - campaign can be created without document or rich text
+    return hasBasicFields && hasValidDates;
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="bg-gray-800 border-gray-700 text-white max-w-5xl max-h-[90vh] overflow-visible">
         <DialogHeader>
           <DialogTitle>Add New Campaign</DialogTitle>
         </DialogHeader>
         
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="max-h-[calc(90vh-8rem)] overflow-y-auto pr-2">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 bg-gray-700">
             <TabsTrigger value="details" className="text-gray-200 flex items-center gap-2">
               <FileText className="w-4 h-4" />
               Campaign Details
             </TabsTrigger>
-            <TabsTrigger value="contract" className="text-gray-200 flex items-center gap-2">
-              <Edit className="w-4 h-4" />
-              Contract & Rules
+            <TabsTrigger value="document" className="text-gray-200 flex items-center gap-2">
+              <Upload className="w-4 h-4" />
+              Document Upload
             </TabsTrigger>
           </TabsList>
 
@@ -133,7 +131,10 @@ export const AddCampaignDialog = ({
 
             <div className="flex items-center justify-between gap-4">
               <div className="flex-1">
-                <Label>Start Date</Label>
+                <Label>Start Date & Time</Label>
+                <p className="text-xs text-gray-400 mb-1">
+                  Must be at least 10 minutes from now
+                </p>
                 <CustomDatePicker
                   selected={
                     form.watch("startDate")
@@ -146,18 +147,21 @@ export const AddCampaignDialog = ({
                       date ? Math.floor(date.getTime() / 1000) : 0
                     )
                   }
-                  placeholderText="Select start date and time"
+                  placeholderText="Select start date & time"
                   dateFormat="yyyy-MM-dd"
-                  showTimeSelect={true}
                   timeFormat="HH:mm"
+                  showTimeSelect={true}
                   timeIntervals={15}
-                  minDate={minStartDate}
+                  minDate={minStartDateTime}
                   className="w-full"
                   showIcon={true}
                 />
               </div>
               <div className="flex-1">
-                <Label>End Date</Label>
+                <Label>End Date & Time</Label>
+                <p className="text-xs text-gray-400 mb-1">
+                  Must be at least 1 hour after start time
+                </p>
                 <CustomDatePicker
                   selected={
                     form.watch("endDate")
@@ -170,12 +174,12 @@ export const AddCampaignDialog = ({
                       date ? Math.floor(date.getTime() / 1000) : 0
                     )
                   }
-                  placeholderText="Select end date and time"
+                  placeholderText="Select end date & time"
                   dateFormat="yyyy-MM-dd"
-                  showTimeSelect={true}
                   timeFormat="HH:mm"
+                  showTimeSelect={true}
                   timeIntervals={15}
-                  minDate={minEndDate}
+                  minDate={minEndDateTime}
                   className="w-full"
                   showIcon={true}
                 />
@@ -208,7 +212,7 @@ export const AddCampaignDialog = ({
             <div className="flex justify-end pt-4">
               <Button
                 type="button"
-                onClick={() => setActiveTab("contract")}
+                onClick={() => setActiveTab("document")}
                 className="bg-primary flex-1"
               >
                 Next
@@ -216,25 +220,20 @@ export const AddCampaignDialog = ({
             </div>
           </TabsContent>
 
-          <TabsContent value="contract" className="mt-6 space-y-4">
+          <TabsContent value="document" className="mt-6 space-y-4">
             <div>
-              <Label className="text-white mb-2 block">Campaign Rules & Contract</Label>
-              <div className="bg-gray-800 rounded-lg border border-gray-600">
-                  <RichTextEditor
-                    value={campaignRules}
-                    onUpload={handleRichTextUpload}
-                    onChange={setCampaignRules}
-                    isUploading={isUploading}
-                    placeholder="Enter detailed campaign rules and contract terms..."
-                  />
-                </div>
-                
-                {!campaignRules.trim() && (
-                  <p className="text-red-400 text-sm mt-1">
-                    Campaign rules and contract terms are required
-                  </p>
-                )}
-              </div>
+              <Label className="text-white mb-2 block">Campaign Document (Optional)</Label>
+              <p className="text-gray-400 text-sm mb-4">
+                Upload a document containing campaign rules, terms, or additional information. <span className="font-medium">Optional but recommanded.</span>
+              </p>
+              <DocumentUpload
+                onChange={handleDocumentUpload}
+                onUpload={onImmediateUpload}
+                className="w-full"
+                accept=".pdf,.doc,.docx"
+                isUploading={isUploading}
+              />
+            </div>
 
             <div className="flex gap-3 pt-4">
               <Button
@@ -255,6 +254,7 @@ export const AddCampaignDialog = ({
             </div>
           </TabsContent>
         </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
