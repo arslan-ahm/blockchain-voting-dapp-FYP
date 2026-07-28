@@ -92,6 +92,25 @@ bun run deploy:local
 └── README.md
 ```
 
+## ☁️ Deployment (Vercel)
+
+The frontend is configured to deploy on [Vercel](https://vercel.com) by simply connecting this repository — no manual build settings needed, since `vercel.json` at the repo root handles it:
+
+- **Install/Build commands**: run inside `frontend/` via Bun, output to `frontend/dist`
+- **Rewrites**: all routes fall back to `index.html` for client-side routing (`react-router-dom`)
+
+Add these Environment Variables in the Vercel project (Settings → Environment Variables), matching `frontend/.env.example`:
+
+```
+VITE_RPC_URL
+VITE_CONTRACT_ADDRESS
+VITE_ADMIN_ADDRESS
+VITE_PINATA_API_KEY
+VITE_PINATA_API_SECRET
+```
+
+> Only the frontend is deployed to Vercel. Smart contracts must be deployed separately (e.g. to a testnet) and the resulting contract address set as `VITE_CONTRACT_ADDRESS` above.
+
 ## 🤝 Contributing
 
 1. Fork the repository
